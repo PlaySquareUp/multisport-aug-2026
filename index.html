@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>SQUAREUP: San Diego Edition</title>
+    <title>SQUAREUP: San Diego Sports</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -136,8 +136,18 @@
         <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">FIND A GAME</h3>
         
         <div class="input-group">
-            <label>Select Scheduled Matchup</label>
-            <select id="matchup-selector"></select>
+            <label>1. Select Your Team</label>
+            <select id="team-selector">
+                <option value="padres">San Diego Padres (Baseball)</option>
+                <option value="wave">San Diego Wave FC (Soccer)</option>
+                <option value="aztecs">SDSU Aztecs (Football)</option>
+                <option value="chargers">Los Angeles Chargers (Football)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>2. Select Upcoming Game</label>
+            <select id="game-selector"></select>
         </div>
         
         <div class="toggle-group">
@@ -255,26 +265,72 @@
             ]
         };
 
-        // Verified curated schedule matchups for San Diego teams + Chargers
-        const scheduledMatchups = [
-            { sport: "baseball", label: "San Diego Padres vs. Los Angeles Dodgers", t1: "San Diego Padres", t2: "Los Angeles Dodgers" },
-            { sport: "baseball", label: "San Diego Padres vs. San Francisco Giants", t1: "San Diego Padres", t2: "San Francisco Giants" },
-            { sport: "baseball", label: "San Diego Padres vs. Arizona Diamondbacks", t1: "San Diego Padres", t2: "Arizona Diamondbacks" },
-            { sport: "baseball", label: "San Diego Padres vs. Colorado Rockies", t1: "San Diego Padres", t2: "Colorado Rockies" },
-            { sport: "soccer", label: "San Diego Wave FC vs. Angel City FC", t1: "San Diego Wave FC", t2: "Angel City FC" },
-            { sport: "soccer", label: "San Diego Wave FC vs. Bay FC", t1: "San Diego Wave FC", t2: "Bay FC" },
-            { sport: "soccer", label: "San Diego Wave FC vs. Portland Thorns FC", t1: "San Diego Wave FC", t2: "Portland Thorns FC" },
-            { sport: "soccer", label: "San Diego Wave FC vs. Seattle Reign FC", t1: "San Diego Wave FC", t2: "Seattle Reign FC" },
-            { sport: "football", label: "SDSU Aztecs vs. Fresno State", t1: "SDSU Aztecs", t2: "Fresno State" },
-            { sport: "football", label: "SDSU Aztecs vs. Boise State", t1: "SDSU Aztecs", t2: "Boise State" },
-            { sport: "football", label: "Los Angeles Chargers vs. Kansas City Chiefs", t1: "Los Angeles Chargers", t2: "Kansas City Chiefs" },
-            { sport: "football", label: "Los Angeles Chargers vs. Las Vegas Raiders", t1: "Los Angeles Chargers", t2: "Las Vegas Raiders" }
-        ];
+        // Team schedules mapping to sport and verified real upcoming games
+        const teamSchedules = {
+            padres: {
+                sport: "baseball",
+                teamName: "San Diego Padres",
+                games: [
+                    { id: "padres_PIT_2026_08_25", label: "vs. Pittsburgh Pirates (Aug 25)", opponent: "Pittsburgh Pirates", date: "2026-08-25" },
+                    { id: "padres_PIT_2026_08_26", label: "vs. Pittsburgh Pirates (Aug 26)", opponent: "Pittsburgh Pirates", date: "2026-08-26" },
+                    { id: "padres_TB_2026_08_28", label: "@ Tampa Bay Rays (Aug 28)", opponent: "Tampa Bay Rays", date: "2026-08-28" },
+                    { id: "padres_TB_2026_08_29", label: "@ Tampa Bay Rays (Aug 29)", opponent: "Tampa Bay Rays", date: "2026-08-29" },
+                    { id: "padres_TB_2026_08_30", label: "@ Tampa Bay Rays (Aug 30)", opponent: "Tampa Bay Rays", date: "2026-08-30" },
+                    { id: "padres_CIN_2026_08_31", label: "@ Cincinnati Reds (Aug 31)", opponent: "Cincinnati Reds", date: "2026-08-31" },
+                    { id: "padres_NYY_2026_09_04", label: "vs. New York Yankees (Sep 04)", opponent: "New York Yankees", date: "2026-09-04" },
+                    { id: "padres_NYY_2026_09_05", label: "vs. New York Yankees (Sep 05)", opponent: "New York Yankees", date: "2026-09-05" },
+                    { id: "padres_NYY_2026_09_06", label: "vs. New York Yankees (Sep 06)", opponent: "New York Yankees", date: "2026-09-06" }
+                ]
+            },
+            wave: {
+                sport: "soccer",
+                teamName: "San Diego Wave FC",
+                games: [
+                    { id: "wave_LOU_2026_08_28", label: "vs. Racing Louisville FC (Aug 28)", opponent: "Racing Louisville FC", date: "2026-08-28" },
+                    { id: "wave_SEA_2026_09_06", label: "@ Seattle Reign FC (Sep 06)", opponent: "Seattle Reign FC", date: "2026-09-06" },
+                    { id: "wave_NC_2026_09_12", label: "vs. North Carolina Courage (Sep 12)", opponent: "North Carolina Courage", date: "2026-09-12" },
+                    { id: "wave_KC_2026_09_18", label: "vs. Kansas City Current (Sep 18)", opponent: "Kansas City Current", date: "2026-09-18" },
+                    { id: "wave_LOU_2026_09_25", label: "@ Racing Louisville FC (Sep 25)", opponent: "Racing Louisville FC", date: "2026-09-25" }
+                ]
+            },
+            aztecs: {
+                sport: "football",
+                teamName: "SDSU Aztecs",
+                games: [
+                    { id: "aztecs_PSU_2026_09_05", label: "vs. Portland State (Sep 05)", opponent: "Portland State", date: "2026-09-05" },
+                    { id: "aztecs_UCLA_2026_09_12", label: "@ UCLA Bruins (Sep 12)", opponent: "UCLA Bruins", date: "2026-09-12" },
+                    { id: "aztecs_JM_2026_09_19", label: "vs. James Madison (Sep 19)", opponent: "James Madison", date: "2026-09-19" },
+                    { id: "aztecs_TOL_2026_09_26", label: "@ Toledo Rockets (Sep 26)", opponent: "Toledo Rockets", date: "2026-09-26" },
+                    { id: "aztecs_TXST_2026_10_03", label: "vs. Texas State (Oct 03)", opponent: "Texas State", date: "2026-10-03" }
+                ]
+            },
+            chargers: {
+                sport: "football",
+                teamName: "Los Angeles Chargers",
+                games: [
+                    { id: "chargers_LAR_2026_08_27", label: "vs. Los Angeles Rams (Preseason - Aug 27)", opponent: "Los Angeles Rams", date: "2026-08-27" },
+                    { id: "chargers_ARI_2026_09_13", label: "vs. Arizona Cardinals (Sep 13)", opponent: "Arizona Cardinals", date: "2026-09-13" },
+                    { id: "chargers_LV_2026_09_20", label: "vs. Las Vegas Raiders (Sep 20)", opponent: "Las Vegas Raiders", date: "2026-09-20" },
+                    { id: "chargers_BUF_2026_09_27", label: "@ Buffalo Bills (Sep 27)", opponent: "Buffalo Bills", date: "2026-09-27" },
+                    { id: "chargers_SEA_2026_10_04", label: "@ Seattle Seahawks (Oct 04)", opponent: "Seattle Seahawks", date: "2026-10-04" }
+                ]
+            }
+        };
 
-        const matchupSelect = document.getElementById('matchup-selector');
-        scheduledMatchups.forEach((m, idx) => {
-            matchupSelect.add(new Option(m.label, idx));
-        });
+        const teamSelect = document.getElementById('team-selector');
+        const gameSelect = document.getElementById('game-selector');
+
+        function updateGameDropdown() {
+            const selectedTeamKey = teamSelect.value;
+            const teamObj = teamSchedules[selectedTeamKey];
+            gameSelect.innerHTML = "";
+            teamObj.games.forEach(g => {
+                gameSelect.add(new Option(g.label, g.id));
+            });
+        }
+
+        teamSelect.addEventListener('change', updateGameDropdown);
+        updateGameDropdown();
 
         let userId = "";
         let userDisplayName = "Guest";
@@ -428,15 +484,15 @@
         });
 
         document.getElementById('lock-game-btn').addEventListener('click', () => {
-            const selectedMatch = scheduledMatchups[matchupSelect.value];
-            const sport = selectedMatch.sport;
-            const t1 = selectedMatch.t1;
-            const t2 = selectedMatch.t2;
-
-            const sortedTeams = [t1, t2].sort();
+            const teamKey = teamSelect.value;
+            const teamObj = teamSchedules[teamKey];
+            const selectedGameId = gameSelect.value;
+            const gameObj = teamObj.games.find(g => g.id === selectedGameId);
+            
+            const sport = teamObj.sport;
             const seedCode = document.getElementById('layout-seed-code').value.trim().toUpperCase();
             const groupIdInput = seedCode ? `_${seedCode}` : "";
-            const lobbyName = `lobby_${sport}_${sortedTeams[0].replace(/\s+/g, "")}_vs_${sortedTeams[1].replace(/\s+/g, "")}${groupIdInput}`;
+            const lobbyName = `lobby_${gameObj.id}${groupIdInput}`;
             
             const existingMatchCard = Object.values(activeCardsList).find(c => c.lobby === lobbyName);
             if(existingMatchCard) {
@@ -468,7 +524,7 @@
                 cardId, 
                 name: userDisplayName, 
                 lobby: lobbyName, 
-                match: selectedMatch.label,
+                match: `${teamObj.teamName} ${gameObj.label}`,
                 sport: sport.toUpperCase(),
                 groupId: seedCode || "Public",
                 board: generatedBoard, 
