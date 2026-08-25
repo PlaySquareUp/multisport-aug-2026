@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>SQUAREUP: Multi-Sport Edition</title>
+    <title>SQUAREUP: San Diego Edition</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -125,38 +125,23 @@
 <body>
 
     <div class="profile-row">
-        <div>Player Name: <span id="identity-status-label" class="user-badge">Guest Player</span></div>
+        <div>LOGGED IN AS: <span id="identity-status-label" class="user-badge">Guest Player</span></div>
         <div id="auth-header-action" class="auth-trigger-btn" onclick="openAuthModal()">Login / Sign Up</div>
     </div>
 
     <h1>SQUAREUP</h1>
-    <p class="subtitle">Multi-Sport Live Game Companion</p>
+    <p class="subtitle">San Diego Sports Live Game Companion</p>
 
     <div class="widget-box" id="setup-card">
-        <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">GENERATE MATCH CARD</h3>
+        <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">FIND A GAME</h3>
         
         <div class="input-group">
-            <label>Select Sport</label>
-            <select id="sport-selector">
-                <option value="baseball">Baseball (MLB)</option>
-                <option value="soccer">Soccer (NWSL / General)</option>
-                <option value="football">Football (College & NFL)</option>
-            </select>
-        </div>
-
-        <div style="display: flex; gap: 10px;">
-            <div class="input-group" style="flex: 1;">
-                <label>Team 1</label>
-                <select id="team-1"></select>
-            </div>
-            <div class="input-group" style="flex: 1;">
-                <label>Team 2</label>
-                <select id="team-2"></select>
-            </div>
+            <label>Select Scheduled Matchup</label>
+            <select id="matchup-selector"></select>
         </div>
         
         <div class="toggle-group">
-            <span class="toggle-label">Sync Exact Board (Friends)</span>
+            <span class="toggle-label">USE A GROUP CODE</span>
             <label class="switch">
                 <input type="checkbox" id="sync-layout-toggle">
                 <span class="slider"></span>
@@ -165,10 +150,10 @@
 
         <div class="input-group" id="seed-input-container" style="display: none;">
             <label>Group Code</label>
-            <input type="text" id="layout-seed-code" placeholder="e.g., BAR2026">
+            <input type="text" id="layout-seed-code" placeholder="e.g., BARSD">
         </div>
 
-        <button class="btn" id="lock-game-btn">Start Playing Now</button>
+        <button class="btn" id="lock-game-btn">Find A Game</button>
         <button class="btn btn-secondary" id="logout-btn" style="display: none;">Log Out Account</button>
     </div>
 
@@ -236,7 +221,6 @@
         const database = getDatabase(app);
         const auth = getAuth(app);
 
-        // Universal Core Squares included in all pools
         const universalCore = [
             "Non-Basic Celebration", "Player with Cool Hair/Tattoos", "Cute Kids on Screen", "Dancing Fans", "Celebrity Sighting"
         ];
@@ -271,39 +255,26 @@
             ]
         };
 
-        const leagueTeams = {
-            baseball: [
-                "San Diego Padres", "Los Angeles Dodgers", "San Francisco Giants", "Los Angeles Angels", 
-                "Athletics", "Arizona Diamondbacks", "Colorado Rockies", "New York Yankees", "Boston Red Sox", "Chicago Cubs"
-            ].sort(),
-            soccer: [
-                "San Diego Wave FC", "Angel City FC", "Bay FC", "Portland Thorns FC", "Seattle Reign FC", 
-                "Utah Royals", "Kansas City Current", "Orlando Pride", "Washington Spirit", "Gotham FC", 
-                "North Carolina Courage", "Racing Louisville FC", "Chicago Stars FC", "Houston Dash"
-            ].sort(),
-            football: [
-                "SDSU Aztecs", "Los Angeles Chargers", "Los Angeles Rams", "San Francisco 49ers", 
-                "Alabama Crimson Tide", "Georgia Bulldogs", "Ohio State Buckeyes", "Texas Longhorns", "Michigan Wolverines"
-            ].sort()
-        };
+        // Verified curated schedule matchups for San Diego teams + Chargers
+        const scheduledMatchups = [
+            { sport: "baseball", label: "San Diego Padres vs. Los Angeles Dodgers", t1: "San Diego Padres", t2: "Los Angeles Dodgers" },
+            { sport: "baseball", label: "San Diego Padres vs. San Francisco Giants", t1: "San Diego Padres", t2: "San Francisco Giants" },
+            { sport: "baseball", label: "San Diego Padres vs. Arizona Diamondbacks", t1: "San Diego Padres", t2: "Arizona Diamondbacks" },
+            { sport: "baseball", label: "San Diego Padres vs. Colorado Rockies", t1: "San Diego Padres", t2: "Colorado Rockies" },
+            { sport: "soccer", label: "San Diego Wave FC vs. Angel City FC", t1: "San Diego Wave FC", t2: "Angel City FC" },
+            { sport: "soccer", label: "San Diego Wave FC vs. Bay FC", t1: "San Diego Wave FC", t2: "Bay FC" },
+            { sport: "soccer", label: "San Diego Wave FC vs. Portland Thorns FC", t1: "San Diego Wave FC", t2: "Portland Thorns FC" },
+            { sport: "soccer", label: "San Diego Wave FC vs. Seattle Reign FC", t1: "San Diego Wave FC", t2: "Seattle Reign FC" },
+            { sport: "football", label: "SDSU Aztecs vs. Fresno State", t1: "SDSU Aztecs", t2: "Fresno State" },
+            { sport: "football", label: "SDSU Aztecs vs. Boise State", t1: "SDSU Aztecs", t2: "Boise State" },
+            { sport: "football", label: "Los Angeles Chargers vs. Kansas City Chiefs", t1: "Los Angeles Chargers", t2: "Kansas City Chiefs" },
+            { sport: "football", label: "Los Angeles Chargers vs. Las Vegas Raiders", t1: "Los Angeles Chargers", t2: "Las Vegas Raiders" }
+        ];
 
-        const sportSelect = document.getElementById('sport-selector');
-        const s1 = document.getElementById('team-1'); 
-        const s2 = document.getElementById('team-2');
-
-        function updateTeamDropdowns() {
-            const currentSport = sportSelect.value;
-            const teams = leagueTeams[currentSport];
-            s1.innerHTML = ""; s2.innerHTML = "";
-            teams.forEach(t => { 
-                s1.add(new Option(t, t)); 
-                s2.add(new Option(t, t)); 
-            });
-            if(teams.length > 1) s2.selectedIndex = 1;
-        }
-
-        sportSelect.addEventListener('change', updateTeamDropdowns);
-        updateTeamDropdowns();
+        const matchupSelect = document.getElementById('matchup-selector');
+        scheduledMatchups.forEach((m, idx) => {
+            matchupSelect.add(new Option(m.label, idx));
+        });
 
         let userId = "";
         let userDisplayName = "Guest";
@@ -457,10 +428,11 @@
         });
 
         document.getElementById('lock-game-btn').addEventListener('click', () => {
-            const t1 = s1.value; const t2 = s2.value;
-            if (t1 === t2) { alert("Select two different teams/opponents!"); return; }
+            const selectedMatch = scheduledMatchups[matchupSelect.value];
+            const sport = selectedMatch.sport;
+            const t1 = selectedMatch.t1;
+            const t2 = selectedMatch.t2;
 
-            const sport = sportSelect.value;
             const sortedTeams = [t1, t2].sort();
             const seedCode = document.getElementById('layout-seed-code').value.trim().toUpperCase();
             const groupIdInput = seedCode ? `_${seedCode}` : "";
@@ -496,7 +468,7 @@
                 cardId, 
                 name: userDisplayName, 
                 lobby: lobbyName, 
-                match: `${t1} vs ${t2}`,
+                match: selectedMatch.label,
                 sport: sport.toUpperCase(),
                 groupId: seedCode || "Public",
                 board: generatedBoard, 
