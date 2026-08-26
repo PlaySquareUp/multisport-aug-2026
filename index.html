@@ -114,7 +114,6 @@
         .badge { background: #333333; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: #ffffff; }
         .badge.win { background: var(--accent); color: #ffffff; }
 
-        /* Drawer / Modal Cards List */
         .drawer-card-item {
             background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px;
             margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; text-align: left;
@@ -177,7 +176,6 @@
         <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;" onclick="toggleSetupView(false)">Cancel</button>
     </div>
 
-    <!-- Active Match Hub Banner -->
     <div class="active-match-banner" id="active-match-banner" style="display: none;">
         <div class="banner-top-row">
             <span class="banner-match-title" id="banner-match-text">Select a game...</span>
@@ -201,7 +199,6 @@
         <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #a0aec0;">No historical card instances found.</div>
     </div>
 
-    <!-- Games Drawer Modal -->
     <div class="modal-overlay" id="games-drawer-modal">
         <div class="modal">
             <h3 style="margin-top: 0; font-size: 1.3rem;">YOUR ACTIVE GAMES</h3>
@@ -211,7 +208,6 @@
         </div>
     </div>
 
-    <!-- Auth Modal -->
     <div class="modal-overlay" id="auth-modal">
         <div class="modal">
             <h3 id="auth-title" style="margin-top: 0; font-size: 1.4rem;">CREATE ACCOUNT</h3>
@@ -235,7 +231,6 @@
         </div>
     </div>
 
-    <!-- Bingo Modal -->
     <div class="modal-overlay" id="bingo-modal">
         <div class="modal">
             <h2 style="font-size: 3.5rem; margin: 0 0 10px 0; color: var(--accent);">BINGO</h2>
@@ -249,7 +244,6 @@
         import { getDatabase, ref, set, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
-        // Expose all inline-onclick handlers globally right away
         window.openAuthModal = () => document.getElementById('auth-modal').classList.add('active');
         window.closeAuthModal = () => document.getElementById('auth-modal').classList.remove('active');
         window.closeBingoModal = () => document.getElementById("bingo-modal").classList.remove("active");
@@ -393,6 +387,9 @@
             }
         };
 
+        window.openGamesDrawer = () => document.getElementById('games-drawer-modal').classList.add('active');
+        window.closeGamesDrawer = () => document.getElementById('games-drawer-modal').classList.remove('active');
+
         document.getElementById('sync-layout-toggle').addEventListener('change', (e) => {
             document.getElementById('seed-input-container').style.display = e.target.checked ? "block" : "none";
         });
@@ -448,6 +445,7 @@
             }
         });
 
+        // FIXED: Added robust .then() and .catch() blocks so errors show up in console instead of hanging silently
         authSubmitBtn.addEventListener('click', () => {
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
@@ -470,12 +468,21 @@
 
             if(isLoginMode) {
                 signInWithEmailAndPassword(auth, email, password)
-                    .then(() => closeAuthModal())
-                    .catch(err => displayError(err.message));
+                    .then((userCredential) => {
+                        console.log("Logged in successfully:", userCredential.user.uid);
+                        closeAuthModal();
+                    })
+                    .catch(err => {
+                        console.error("Login failed:", err.code, err.message);
+                        displayError(err.message);
+                    });
             } else {
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
-                        set(ref(database, `users/${userCredential.user.uid}/profile`), { username: username });
+                        console.log("Account created successfully:", userCredential.user.uid);
+                        return set(ref(database, `users/${userCredential.user.uid}/profile`), { username: username });
+                    })
+                    .then(() => {
                         const guestCards = JSON.parse(localStorage.getItem("squareup_guest_cards") || "{}");
                         Object.keys(guestCards).forEach(cid => {
                             guestCards[cid].name = username; 
@@ -485,7 +492,10 @@
                         localStorage.removeItem("squareup_guest_cards"); 
                         closeAuthModal();
                     })
-                    .catch(err => displayError(err.message));
+                    .catch(err => {
+                        console.error("Sign up failed:", err.code, err.message);
+                        displayError(err.message);
+                    });
             }
         });
 
@@ -503,7 +513,6 @@
             if (user) {
                 userId = user.uid;
                 isGuestAccount = false;
-                document.getElementById('logout-btn').style.display = "block";
                 document.getElementById('leaderboard-card').style.display = "block";
                 
                 onValue(ref(database, `users/${userId}/profile`), snap => {
