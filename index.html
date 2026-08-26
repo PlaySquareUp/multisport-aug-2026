@@ -48,6 +48,15 @@
         .trophy-dashboard-box h3 { color: var(--accent); margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #eaeaea; padding-bottom: 8px; }
         .trophy-history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eaeaea; font-size: 0.9rem; align-items: center; color: var(--text-main); }
 
+        /* Filter Tabs */
+        .filter-tabs { display: flex; gap: 6px; margin: 10px 0 12px 0; overflow-x: auto; padding-bottom: 4px; }
+        .filter-tab {
+            background: #eaeaea; border: none; padding: 6px 12px; border-radius: 16px;
+            font-size: 0.75rem; font-weight: 700; color: #555; cursor: pointer; text-transform: uppercase; white-space: nowrap;
+            font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+        }
+        .filter-tab.active { background: var(--accent); color: #ffffff; }
+
         .input-group { margin-bottom: 12px; text-align: left; }
         .input-group label { display: block; margin-bottom: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #ffffff; }
         .input-group input, .input-group select {
@@ -208,6 +217,13 @@
 
     <div class="trophy-dashboard-box" id="history-card">
         <h3>🏆 TROPHY ROOM & STATS</h3>
+        <div class="filter-tabs">
+            <button class="filter-tab active" onclick="setHistoryFilter('all', this)">All</button>
+            <button class="filter-tab" onclick="setHistoryFilter('wins', this)">Wins 🏆</button>
+            <button class="filter-tab" onclick="setHistoryFilter('baseball', this)">Baseball ⚾</button>
+            <button class="filter-tab" onclick="setHistoryFilter('soccer', this)">Soccer ⚽</button>
+            <button class="filter-tab" onclick="setHistoryFilter('football', this)">Football 🏈</button>
+        </div>
         <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #555555;">No historical card instances found.</div>
     </div>
 
@@ -398,6 +414,14 @@
         let isLoginMode = false; 
         let isClaimMode = false; 
         let globalLobbiesMaxScores = {}; 
+        let currentHistoryFilter = 'all';
+
+        window.setHistoryFilter = function(filter, btn) {
+            currentHistoryFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            renderHistory();
+        };
 
         window.toggleSetupView = function(showSetup) {
             const setupCard = document.getElementById('setup-card');
@@ -841,6 +865,20 @@
             const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
             const now = Date.now();
 
+            // Filter data based on current tab selection
+            const filteredData = historyData.filter(c => {
+                const sportStr = (c.sport || "").toUpperCase();
+                const matchStr = (c.match || "").toUpperCase();
+                const combined = sportStr + " " + matchStr;
+                const isWon = (c.completedLines || 0) > 0;
+
+                if (currentHistoryFilter === 'wins') return isWon;
+                if (currentHistoryFilter === 'baseball') return combined.includes("BASEBALL");
+                if (currentHistoryFilter === 'soccer') return combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE");
+                if (currentHistoryFilter === 'football') return combined.includes("FOOTBALL") && !combined.includes("WORLD CUP");
+                return true; // 'all'
+            });
+
             const totalWins = historyData.reduce((acc, c) => acc + (c.completedLines || 0), 0);
             const totalPoints = historyData.reduce((acc, c) => {
                 const base = c.board.filter(s => s.isSelected).length;
@@ -864,39 +902,43 @@
                 </div>
             `;
 
-            html += historyData.map(c => {
-                const base = c.board.filter(s => s.isSelected).length;
-                const score = base + ((c.completedLines || 0) * 5);
-                const isWon = (c.completedLines || 0) > 0;
-                
-                const cardAge = c.createdAt ? (now - c.createdAt) : FORTY_EIGHT_HOURS + 1;
-                const isClosed = cardAge > FORTY_EIGHT_HOURS;
-                
-                let badgeHTML = "";
-                if (isClosed) {
-                    badgeHTML = `<span class="badge closed">Closed</span>`;
-                } else if (isWon) { 
-                    badgeHTML = `<span class="badge win">BINGO x${c.completedLines}</span>`; 
-                } else { 
-                    badgeHTML = `<span class="badge" style="background:#ddd; color:#333;">Active</span>`; 
-                }
+            if (filteredData.length === 0) {
+                html += `<p style='color: #666; font-size: 0.85rem; text-align: center; margin: 15px 0;'>No matches found for this filter.</p>`;
+            } else {
+                html += filteredData.map(c => {
+                    const base = c.board.filter(s => s.isSelected).length;
+                    const score = base + ((c.completedLines || 0) * 5);
+                    const isWon = (c.completedLines || 0) > 0;
+                    
+                    const cardAge = c.createdAt ? (now - c.createdAt) : FORTY_EIGHT_HOURS + 1;
+                    const isClosed = cardAge > FORTY_EIGHT_HOURS;
+                    
+                    let badgeHTML = "";
+                    if (isClosed) {
+                        badgeHTML = `<span class="badge closed">Closed</span>`;
+                    } else if (isWon) { 
+                        badgeHTML = `<span class="badge win">BINGO x${c.completedLines}</span>`; 
+                    } else { 
+                        badgeHTML = `<span class="badge" style="background:#ddd; color:#333;">Active</span>`; 
+                    }
 
-                const sportIcon = getSportEmoji(c.sport, c.match);
-                const maxLobbyScore = globalLobbiesMaxScores[c.lobby] || 0;
-                const holdsHighScore = score >= maxLobbyScore && score > 1;
-                const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
-                const groupLabel = c.groupId && c.groupId !== "Public" ? ` [Group: ${c.groupId}]` : "";
+                    const sportIcon = getSportEmoji(c.sport, c.match);
+                    const maxLobbyScore = globalLobbiesMaxScores[c.lobby] || 0;
+                    const holdsHighScore = score >= maxLobbyScore && score > 1;
+                    const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
+                    const groupLabel = c.groupId && c.groupId !== "Public" ? ` [Group: ${c.groupId}]` : "";
 
-                return `
-                    <div class='trophy-history-item' id="score-row-${c.cardId}">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; font-weight: 500;">${sportIcon} ${c.match}${groupLabel}</span>
-                        <div style="display: flex; align-items: center; flex-shrink: 0;">
-                            ${badgeHTML}
-                            <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
+                    return `
+                        <div class='trophy-history-item' id="score-row-${c.cardId}">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; font-weight: 500;">${sportIcon} ${c.match}${groupLabel}</span>
+                            <div style="display: flex; align-items: center; flex-shrink: 0;">
+                                ${badgeHTML}
+                                <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
+                            </div>
                         </div>
-                    </div>
-                `;
-            }).join("");
+                    `;
+                }).join("");
+            }
 
             container.innerHTML = html;
         }
