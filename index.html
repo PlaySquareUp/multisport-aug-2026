@@ -142,7 +142,7 @@
     <h1>SQUAREUP</h1>
     <p class="subtitle">San Diego Sports Edition</p>
 
-    <div class="widget-box" id="setup-card" style="display: none;">
+    <div class="widget-box" id="setup-card">
         <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">FIND A GAME</h3>
         
         <div class="input-group">
@@ -174,7 +174,7 @@
         </div>
 
         <button class="btn" id="lock-game-btn">Find A Game</button>
-        <button class="btn btn-secondary" onclick="toggleSetupView(false)">Cancel</button>
+        <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;" onclick="toggleSetupView(false)">Cancel</button>
     </div>
 
     <!-- Active Match Hub Banner -->
@@ -376,6 +376,7 @@
 
         window.toggleSetupView = function(showSetup) {
             document.getElementById('setup-card').style.display = showSetup ? "block" : "none";
+            document.getElementById('cancel-setup-btn').style.display = (showSetup && Object.keys(activeCardsList).length > 0) ? "inline-block" : "none";
             document.getElementById('active-match-banner').style.display = showSetup ? "none" : (Object.keys(activeCardsList).length > 0 ? "flex" : "none");
             document.getElementById('bingo-board').style.display = showSetup ? "none" : "grid";
             if(showSetup) {
