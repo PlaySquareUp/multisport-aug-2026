@@ -48,7 +48,6 @@
         .trophy-dashboard-box h3 { color: var(--accent); margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #eaeaea; padding-bottom: 8px; }
         .trophy-history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eaeaea; font-size: 0.9rem; align-items: center; color: var(--text-main); }
 
-        /* Filter Tabs */
         .filter-tabs { display: flex; gap: 6px; margin: 10px 0 12px 0; overflow-x: auto; padding-bottom: 4px; }
         .filter-tab {
             background: #eaeaea; border: none; padding: 6px 12px; border-radius: 16px;
@@ -301,7 +300,7 @@
             const combined = ((sportStr || "") + " " + (matchTitle || "")).toUpperCase();
             if (combined.includes("BASEBALL")) return "⚾";
             if (combined.includes("FOOTBALL") && !combined.includes("WORLD CUP")) return "🏈";
-            if (combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE")) return "⚽";
+            if (combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE") || !sportStr) return "⚽";
             return "⚽";
         }
 
@@ -865,7 +864,6 @@
             const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
             const now = Date.now();
 
-            // Filter data based on current tab selection
             const filteredData = historyData.filter(c => {
                 const sportStr = (c.sport || "").toUpperCase();
                 const matchStr = (c.match || "").toUpperCase();
@@ -874,9 +872,9 @@
 
                 if (currentHistoryFilter === 'wins') return isWon;
                 if (currentHistoryFilter === 'baseball') return combined.includes("BASEBALL");
-                if (currentHistoryFilter === 'soccer') return combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE");
+                if (currentHistoryFilter === 'soccer') return combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE") || !c.sport;
                 if (currentHistoryFilter === 'football') return combined.includes("FOOTBALL") && !combined.includes("WORLD CUP");
-                return true; // 'all'
+                return true;
             });
 
             const totalWins = historyData.reduce((acc, c) => acc + (c.completedLines || 0), 0);
