@@ -472,11 +472,8 @@
                 const keys = Object.keys(activeCardsList);
                 if(keys.length > 0) {
                     if(!currentCardId || !activeCardsList[currentCardId]) currentCardId = keys[0];
-                    renderActiveBoard();
-                    toggleSetupView(false);
-                } else {
-                    toggleSetupView(true);
                 }
+                toggleSetupView(true);
             }
         }
 
@@ -687,13 +684,11 @@
                 Promise.all(fetchPromises).then(() => renderHistory());
                 
                 const keys = Object.keys(activeCardsList);
-                if (keys.length > 0) {
-                    if (!currentCardId || !activeCardsList[currentCardId]) currentCardId = keys[0];
-                    renderActiveBoard();
-                    toggleSetupView(false);
-                } else {
-                    toggleSetupView(true);
+                if (keys.length > 0 && !currentCardId) {
+                    currentCardId = keys[0];
                 }
+                // Keep the setup/find-a-game view front-and-center upon login/sync
+                toggleSetupView(true);
             });
         }
 
@@ -749,7 +744,6 @@
                     const keys = Object.keys(activeCardsList);
                     if(keys.length > 0) {
                         currentCardId = keys[0];
-                        renderActiveBoard();
                     } else {
                         toggleSetupView(true);
                     }
