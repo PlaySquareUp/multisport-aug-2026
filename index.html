@@ -289,14 +289,6 @@
             return "⚽";
         }
 
-        function getFreeSpaceEmoji(sportStr, matchTitle) {
-            const combined = ((sportStr || "") + " " + (matchTitle || "")).toUpperCase();
-            if (combined.includes("BASEBALL")) return "⚾";
-            if (combined.includes("FOOTBALL") && !combined.includes("WORLD CUP")) return "🏈";
-            if (combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE")) return "⚽";
-            return "⚽";
-        }
-
         const universalCore = [
             "Non-Basic Celebration", "Player with Cool Hair/Tattoos", "Cute Kids on Screen", "Dancing Fans", "Celebrity Sighting"
         ];
@@ -607,11 +599,10 @@
                 shuffled = [...activePool].sort(() => Math.random() - 0.5).slice(0, 24);
             }
 
-            const freeSpaceEmoji = getFreeSpaceEmoji(sport, teamObj.teamName + " " + gameObj.label);
             const generatedBoard = [];
             let poolIdx = 0;
             for (let i = 0; i < 25; i++) {
-                if (i === 12) generatedBoard.push({ text: `FREE SPACE\n${freeSpaceEmoji}`, isSelected: true, isFree: true });
+                if (i === 12) generatedBoard.push({ text: "FREE SPACE", isSelected: true, isFree: true });
                 else generatedBoard.push({ text: shuffled[poolIdx++], isSelected: false, isFree: false });
             }
 
