@@ -40,6 +40,14 @@
             margin-bottom: 16px; width: 100%; max-width: 460px; box-sizing: border-box; color: #ffffff;
         }
 
+        .trophy-dashboard-box {
+            background: #f8f9fa; padding: 16px; border-radius: 12px; border: 2px solid var(--accent);
+            margin-bottom: 16px; width: 100%; max-width: 460px; box-sizing: border-box; color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(125, 57, 235, 0.08);
+        }
+        .trophy-dashboard-box h3 { color: var(--accent); margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #eaeaea; padding-bottom: 8px; }
+        .trophy-history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eaeaea; font-size: 0.9rem; align-items: center; color: var(--text-main); }
+
         .input-group { margin-bottom: 12px; text-align: left; }
         .input-group label { display: block; margin-bottom: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #ffffff; }
         .input-group input, .input-group select {
@@ -63,7 +71,6 @@
         .auth-toggle { font-size: 0.85rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-top: 10px; display: inline-block; font-weight: 700; }
         .error-message { color: var(--error); font-size: 0.85rem; margin-top: 5px; display: none; font-weight: 500; }
 
-        /* Active Match Hub Banner */
         .active-match-banner {
             width: 100%; max-width: 460px; background: #000000; color: #ffffff;
             border: 2px solid var(--accent); border-radius: 10px; padding: 14px;
@@ -110,7 +117,7 @@
         .square.free-space { background-color: var(--free-space); border-color: var(--accent); color: var(--accent); }
         .square.locked { cursor: not-allowed; opacity: 0.8; }
 
-        .history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; font-size: 0.9rem; align-items: center; color: #ffffff; transition: background-color 0.3s ease; }
+        .history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; font-size: 0.9rem; align-items: center; color: #ffffff; }
         .history-item.flash-active { background-color: rgba(125, 57, 235, 0.3); }
         .badge { background: #333333; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: #ffffff; }
         .badge.win { background: var(--accent); color: #ffffff; }
@@ -199,9 +206,9 @@
         <div id="leaderboard-container" style="text-align: left; font-size: 1rem; color: #a0aec0;">No active card selected...</div>
     </div>
 
-    <div class="widget-box" id="history-card">
-        <h3 style="color: #ffffff; margin-top: 0;">TROPHY ROOM & STATS</h3>
-        <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #a0aec0;">No historical card instances found.</div>
+    <div class="trophy-dashboard-box" id="history-card">
+        <h3>🏆 TROPHY ROOM & STATS</h3>
+        <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #555555;">No historical card instances found.</div>
     </div>
 
     <div class="modal-overlay" id="games-drawer-modal">
@@ -275,12 +282,21 @@
         }
 
         function getSportEmoji(sportStr) {
-            if (!sportStr) return "🏆";
+            if (!sportStr) return "⚽";
             const s = sportStr.toUpperCase();
             if (s.includes("BASEBALL")) return "⚾";
             if (s.includes("SOCCER")) return "⚽";
             if (s.includes("FOOTBALL")) return "🏈";
-            return "🏆";
+            return "⚽";
+        }
+
+        function getFreeSpaceEmoji(sportStr) {
+            if (!sportStr) return "⚽";
+            const s = sportStr.toUpperCase();
+            if (s.includes("BASEBALL")) return "⚾";
+            if (s.includes("SOCCER")) return "⚽";
+            if (s.includes("FOOTBALL")) return "🏈";
+            return "⚽";
         }
 
         const universalCore = [
@@ -593,10 +609,11 @@
                 shuffled = [...activePool].sort(() => Math.random() - 0.5).slice(0, 24);
             }
 
+            const freeSpaceEmoji = getFreeSpaceEmoji(sport);
             const generatedBoard = [];
             let poolIdx = 0;
             for (let i = 0; i < 25; i++) {
-                if (i === 12) generatedBoard.push({ text: "FREE SPACE\n⚽", isSelected: true, isFree: true });
+                if (i === 12) generatedBoard.push({ text: `FREE SPACE\n${freeSpaceEmoji}`, isSelected: true, isFree: true });
                 else generatedBoard.push({ text: shuffled[poolIdx++], isSelected: false, isFree: false });
             }
 
@@ -612,11 +629,12 @@
                 createdAt: Date.now() 
             };
             
+            currentCardId = cardId;
+
             if(isGuestAccount) {
                 const updatedCache = { [cardId]: cardPayload, ...activeCardsList };
                 activeCardsList = updatedCache;
                 localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
-                currentCardId = cardId;
                 renderDrawerAndCount();
                 renderHistory();
                 renderActiveBoard();
@@ -625,7 +643,7 @@
             } else {
                 set(ref(database, `users/${userId}/cards/${cardId}`), cardPayload);
                 set(ref(database, `${lobbyName}/${cardId}`), { name: userDisplayName, score: 1 });
-                currentCardId = cardId;
+                renderActiveBoard();
                 toggleSetupView(false);
                 triggerGridFlash();
             }
@@ -690,7 +708,7 @@
                     <div class="drawer-card-item" style="border-color: ${isSelected ? 'var(--accent)' : '#333'};">
                         <div class="drawer-card-info" onclick="selectGameCard('${c.cardId}')" style="cursor: pointer;">
                             <div class="drawer-card-title">${c.match}${groupLabel}</div>
-                            <div class="drawer-card-sub">${c.sport} • ${statusLabel}</div>
+                            <div class="drawer-card-sub">${c.sport || 'SOCCER'} • ${statusLabel}</div>
                         </div>
                         <button class="btn btn-danger" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" onclick="deleteGameCard('${c.cardId}')">Delete</button>
                     </div>
@@ -740,7 +758,7 @@
             const isClosed = (Date.now() - (activeCard.createdAt || Date.now())) > FORTY_EIGHT_HOURS;
 
             document.getElementById("banner-match-text").innerText = activeCard.match + (isClosed ? " [CLOSED]" : "");
-            document.getElementById("banner-sport-tag").innerText = activeCard.sport || "SPORT";
+            document.getElementById("banner-sport-tag").innerText = activeCard.sport || "SOCCER";
 
             const container = document.getElementById("bingo-board");
             container.innerHTML = "";
@@ -816,7 +834,7 @@
             
             if (isGuestAccount) {
                 container.innerHTML = `
-                    <div style="text-align: center; padding: 10px 5px; color: #a0aec0; font-size: 0.88rem; line-height: 1.4;">
+                    <div style="text-align: center; padding: 10px 5px; color: #666; font-size: 0.88rem; line-height: 1.4;">
                         <span style="font-size: 1.5rem; display: block; margin-bottom: 4px;">🔒</span>
                         Trophy Room & Stats are locked. Create a free account to track your multiplayer rankings, high-score trophies, and lifetime stats!
                     </div>`;
@@ -825,7 +843,7 @@
 
             const historyData = Object.values(activeCardsList);
             if (historyData.length === 0) { 
-                container.innerHTML = "<p style='color: #a0aec0; font-size: 0.88rem; text-align: center; margin: 0;'>No historical matches logged yet.</p>"; 
+                container.innerHTML = "<p style='color: #666; font-size: 0.88rem; text-align: center; margin: 0;'>No historical matches logged yet.</p>"; 
                 return; 
             }
 
@@ -839,18 +857,18 @@
             }, 0);
 
             let html = `
-                <div style="display: flex; justify-content: space-around; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid #333; text-align: center;">
+                <div style="display: flex; justify-content: space-around; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 2px solid #eaeaea; text-align: center;">
                     <div>
-                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Total Points</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent);">${totalPoints}</div>
+                        <div style="font-size: 0.7rem; color: #7f8c8d; text-transform: uppercase; font-weight: 700;">Total Points</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent);">${totalPoints}</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Lines Cleared</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">${totalWins}</div>
+                        <div style="font-size: 0.7rem; color: #7f8c8d; text-transform: uppercase; font-weight: 700;">Lines Cleared</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);">${totalWins}</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Games Played</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">${historyData.length}</div>
+                        <div style="font-size: 0.7rem; color: #7f8c8d; text-transform: uppercase; font-weight: 700;">Games Played</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);">${historyData.length}</div>
                     </div>
                 </div>
             `;
@@ -867,7 +885,7 @@
                 } else if (isWon) { 
                     badgeHTML = `<span class="badge win">BINGO x${c.completedLines}</span>`; 
                 } else { 
-                    badgeHTML = `<span class="badge">Active</span>`; 
+                    badgeHTML = `<span class="badge" style="background:#ddd; color:#333;">Active</span>`; 
                 }
 
                 const sportIcon = getSportEmoji(c.sport);
@@ -877,8 +895,8 @@
                 const groupLabel = c.groupId && c.groupId !== "Public" ? ` [Group: ${c.groupId}]` : "";
 
                 return `
-                    <div class='history-item' id="score-row-${c.cardId}">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;">${sportIcon} ${c.match}${groupLabel}</span>
+                    <div class='trophy-history-item' id="score-row-${c.cardId}">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; font-weight: 500;">${sportIcon} ${c.match}${groupLabel}</span>
                         <div style="display: flex; align-items: center; flex-shrink: 0;">
                             ${badgeHTML}
                             <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
