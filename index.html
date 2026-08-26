@@ -67,7 +67,7 @@
         .active-match-banner {
             width: 100%; max-width: 460px; background: #000000; color: #ffffff;
             border: 2px solid var(--accent); border-radius: 10px; padding: 14px;
-            margin-bottom: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+            margin-bottom: 16px; box-sizing: border-box; display: none; flex-direction: column; gap: 10px;
         }
         .banner-top-row { display: flex; justify-content: space-between; align-items: center; }
         .banner-match-title { font-size: 1rem; font-weight: 700; text-transform: uppercase; font-family: 'Space Grotesk', sans-serif; }
@@ -90,7 +90,7 @@
         .btn-danger { background-color: var(--error); border: none; }
 
         .grid { 
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 460px; margin: 0 auto 16px auto;
+            display: none; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 460px; margin: 0 auto 16px auto;
             transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
         .grid.flash-pulse {
@@ -135,12 +135,16 @@
 
     <div class="profile-row">
         <div>LOGGED IN AS: <span id="identity-status-label" class="user-badge">Guest Player</span></div>
-        <div id="auth-header-action" class="auth-trigger-btn" onclick="openAuthModal()">Login / Sign Up</div>
+        <div>
+            <span id="auth-header-action" class="auth-trigger-btn" onclick="openAuthModal()" style="margin-right: 10px;">Login / Sign Up</span>
+            <span id="logout-btn" class="auth-trigger-btn" style="display: none; color: #e53e3e;">Log Out</span>
+        </div>
     </div>
 
     <h1>SQUAREUP</h1>
     <p class="subtitle">San Diego Sports Edition</p>
 
+    <!-- Setup Card -->
     <div class="widget-box" id="setup-card">
         <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">FIND A GAME</h3>
         
@@ -176,7 +180,8 @@
         <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;" onclick="toggleSetupView(false)">Cancel</button>
     </div>
 
-    <div class="active-match-banner" id="active-match-banner" style="display: none;">
+    <!-- Active Match Hub Banner -->
+    <div class="active-match-banner" id="active-match-banner">
         <div class="banner-top-row">
             <span class="banner-match-title" id="banner-match-text">Select a game...</span>
             <span class="sport-tag" id="banner-sport-tag">SPORT</span>
@@ -199,6 +204,7 @@
         <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #a0aec0;">No historical card instances found.</div>
     </div>
 
+    <!-- Games Drawer Modal -->
     <div class="modal-overlay" id="games-drawer-modal">
         <div class="modal">
             <h3 style="margin-top: 0; font-size: 1.3rem;">YOUR ACTIVE GAMES</h3>
@@ -208,6 +214,7 @@
         </div>
     </div>
 
+    <!-- Auth Modal -->
     <div class="modal-overlay" id="auth-modal">
         <div class="modal">
             <h3 id="auth-title" style="margin-top: 0; font-size: 1.4rem;">CREATE ACCOUNT</h3>
@@ -231,6 +238,7 @@
         </div>
     </div>
 
+    <!-- Bingo Modal -->
     <div class="modal-overlay" id="bingo-modal">
         <div class="modal">
             <h2 style="font-size: 3.5rem; margin: 0 0 10px 0; color: var(--accent);">BINGO</h2>
@@ -264,6 +272,10 @@
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
+
+        function sanitizeKey(str) {
+            return str.replace(/[.#$*\/[\]]/g, "_");
+        }
 
         const universalCore = [
             "Non-Basic Celebration", "Player with Cool Hair/Tattoos", "Cute Kids on Screen", "Dancing Fans", "Celebrity Sighting"
@@ -376,14 +388,23 @@
         let globalLobbiesMaxScores = {}; 
 
         window.toggleSetupView = function(showSetup) {
-            document.getElementById('setup-card').style.display = showSetup ? "block" : "none";
-            document.getElementById('cancel-setup-btn').style.display = (showSetup && Object.keys(activeCardsList).length > 0) ? "inline-block" : "none";
-            document.getElementById('active-match-banner').style.display = showSetup ? "none" : (Object.keys(activeCardsList).length > 0 ? "flex" : "none");
-            document.getElementById('bingo-board').style.display = showSetup ? "none" : "grid";
-            if(showSetup) {
-                document.getElementById('leaderboard-card').style.display = "none";
-            } else if(currentCardId) {
-                document.getElementById('leaderboard-card').style.display = "block";
+            const setupCard = document.getElementById('setup-card');
+            const banner = document.getElementById('active-match-banner');
+            const board = document.getElementById('bingo-board');
+            const leaderboard = document.getElementById('leaderboard-card');
+            const cancelBtn = document.getElementById('cancel-setup-btn');
+
+            if (showSetup) {
+                setupCard.style.display = "block";
+                cancelBtn.style.display = Object.keys(activeCardsList).length > 0 ? "inline-block" : "none";
+                banner.style.display = "none";
+                board.style.display = "none";
+                leaderboard.style.display = "none";
+            } else {
+                setupCard.style.display = "none";
+                banner.style.display = Object.keys(activeCardsList).length > 0 ? "flex" : "none";
+                board.style.display = "grid";
+                leaderboard.style.display = currentCardId && !isGuestAccount ? "block" : "none";
             }
         };
 
@@ -445,7 +466,6 @@
             }
         });
 
-        // FIXED: Added robust .then() and .catch() blocks so errors show up in console instead of hanging silently
         authSubmitBtn.addEventListener('click', () => {
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
@@ -454,7 +474,7 @@
 
             if (isClaimMode) {
                 if (!username) { displayError("Please enter a username handle."); return; }
-                set(ref(database, `users/${userId}/profile`), { username: username })
+                set(ref(database, `users/${userId}/profile`), { username: sanitizeKey(username) })
                     .then(() => {
                         isClaimMode = false;
                         document.getElementById('auth-toggle-link').style.display = "inline-block"; 
@@ -468,34 +488,24 @@
 
             if(isLoginMode) {
                 signInWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log("Logged in successfully:", userCredential.user.uid);
-                        closeAuthModal();
-                    })
-                    .catch(err => {
-                        console.error("Login failed:", err.code, err.message);
-                        displayError(err.message);
-                    });
+                    .then(() => closeAuthModal())
+                    .catch(err => displayError(err.message));
             } else {
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
-                        console.log("Account created successfully:", userCredential.user.uid);
-                        return set(ref(database, `users/${userCredential.user.uid}/profile`), { username: username });
+                        return set(ref(database, `users/${userCredential.user.uid}/profile`), { username: sanitizeKey(username) });
                     })
                     .then(() => {
                         const guestCards = JSON.parse(localStorage.getItem("squareup_guest_cards") || "{}");
                         Object.keys(guestCards).forEach(cid => {
-                            guestCards[cid].name = username; 
+                            guestCards[cid].name = sanitizeKey(username); 
                             set(ref(database, `users/${userCredential.user.uid}/cards/${cid}`), guestCards[cid]);
-                            set(ref(database, `${guestCards[cid].lobby}/${cid}`), { name: username, score: 1 });
+                            set(ref(database, `${guestCards[cid].lobby}/${cid}`), { name: sanitizeKey(username), score: 1 });
                         });
                         localStorage.removeItem("squareup_guest_cards"); 
                         closeAuthModal();
                     })
-                    .catch(err => {
-                        console.error("Sign up failed:", err.code, err.message);
-                        displayError(err.message);
-                    });
+                    .catch(err => displayError(err.message));
             }
         });
 
@@ -513,7 +523,8 @@
             if (user) {
                 userId = user.uid;
                 isGuestAccount = false;
-                document.getElementById('leaderboard-card').style.display = "block";
+                document.getElementById('logout-btn').style.display = "inline-block";
+                document.getElementById('auth-header-action').style.display = "none";
                 
                 onValue(ref(database, `users/${userId}/profile`), snap => {
                     const prof = snap.val() || {};
@@ -530,7 +541,6 @@
                         userDisplayName = prof.username;
                         isClaimMode = false;
                         document.getElementById('identity-status-label').innerText = `@${userDisplayName}`;
-                        document.getElementById('auth-header-action').style.display = "none";
                     }
                     syncUserSessions();
                 });
@@ -539,7 +549,8 @@
                 userDisplayName = "Guest";
                 isClaimMode = false;
                 document.getElementById('identity-status-label').innerText = "Guest Player";
-                document.getElementById('auth-header-action').style.display = "block";
+                document.getElementById('auth-header-action').style.display = "inline-block";
+                document.getElementById('logout-btn').style.display = "none";
                 loadGuestSessionData();
             }
         });
@@ -551,9 +562,9 @@
             const gameObj = teamObj.games.find(g => g.id === selectedGameId);
             
             const sport = teamObj.sport;
-            const seedCode = document.getElementById('layout-seed-code').value.trim().toUpperCase();
+            const seedCode = sanitizeKey(document.getElementById('layout-seed-code').value.trim().toUpperCase());
             const groupIdInput = seedCode ? `_${seedCode}` : "";
-            const lobbyName = `lobby_${gameObj.id}${groupIdInput}`;
+            const lobbyName = sanitizeKey(`lobby_${gameObj.id}${groupIdInput}`);
             
             const existingMatchCard = Object.values(activeCardsList).find(c => c.lobby === lobbyName);
             if(existingMatchCard) {
