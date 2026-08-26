@@ -281,21 +281,19 @@
             return str.replace(/[.#$*\/[\]]/g, "_");
         }
 
-        function getSportEmoji(sportStr) {
-            if (!sportStr) return "⚽";
-            const s = sportStr.toUpperCase();
-            if (s.includes("BASEBALL")) return "⚾";
-            if (s.includes("SOCCER")) return "⚽";
-            if (s.includes("FOOTBALL")) return "🏈";
+        function getSportEmoji(sportStr, matchTitle) {
+            const combined = ((sportStr || "") + " " + (matchTitle || "")).toUpperCase();
+            if (combined.includes("BASEBALL")) return "⚾";
+            if (combined.includes("FOOTBALL") && !combined.includes("WORLD CUP")) return "🏈";
+            if (combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE")) return "⚽";
             return "⚽";
         }
 
-        function getFreeSpaceEmoji(sportStr) {
-            if (!sportStr) return "⚽";
-            const s = sportStr.toUpperCase();
-            if (s.includes("BASEBALL")) return "⚾";
-            if (s.includes("SOCCER")) return "⚽";
-            if (s.includes("FOOTBALL")) return "🏈";
+        function getFreeSpaceEmoji(sportStr, matchTitle) {
+            const combined = ((sportStr || "") + " " + (matchTitle || "")).toUpperCase();
+            if (combined.includes("BASEBALL")) return "⚾";
+            if (combined.includes("FOOTBALL") && !combined.includes("WORLD CUP")) return "🏈";
+            if (combined.includes("SOCCER") || combined.includes("WORLD CUP") || combined.includes("WAVE")) return "⚽";
             return "⚽";
         }
 
@@ -609,7 +607,7 @@
                 shuffled = [...activePool].sort(() => Math.random() - 0.5).slice(0, 24);
             }
 
-            const freeSpaceEmoji = getFreeSpaceEmoji(sport);
+            const freeSpaceEmoji = getFreeSpaceEmoji(sport, teamObj.teamName + " " + gameObj.label);
             const generatedBoard = [];
             let poolIdx = 0;
             for (let i = 0; i < 25; i++) {
@@ -700,7 +698,8 @@
 
             container.innerHTML = Object.values(activeCardsList).map(c => {
                 const isSelected = c.cardId === currentCardId;
-                const isClosed = (now - (c.createdAt || now)) > FORTY_EIGHT_HOURS;
+                const cardAge = c.createdAt ? (now - c.createdAt) : FORTY_EIGHT_HOURS + 1;
+                const isClosed = cardAge > FORTY_EIGHT_HOURS;
                 const statusLabel = isClosed ? "Closed (Locked)" : (isSelected ? "Active Now" : "Tap to switch");
                 const groupLabel = c.groupId && c.groupId !== "Public" ? ` [${c.groupId}]` : "";
 
@@ -755,7 +754,8 @@
             if (!activeCard) return;
 
             const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
-            const isClosed = (Date.now() - (activeCard.createdAt || Date.now())) > FORTY_EIGHT_HOURS;
+            const cardAge = activeCard.createdAt ? (Date.now() - activeCard.createdAt) : FORTY_EIGHT_HOURS + 1;
+            const isClosed = cardAge > FORTY_EIGHT_HOURS;
 
             document.getElementById("banner-match-text").innerText = activeCard.match + (isClosed ? " [CLOSED]" : "");
             document.getElementById("banner-sport-tag").innerText = activeCard.sport || "SOCCER";
@@ -877,7 +877,9 @@
                 const base = c.board.filter(s => s.isSelected).length;
                 const score = base + ((c.completedLines || 0) * 5);
                 const isWon = (c.completedLines || 0) > 0;
-                const isClosed = (now - (c.createdAt || now)) > FORTY_EIGHT_HOURS;
+                
+                const cardAge = c.createdAt ? (now - c.createdAt) : FORTY_EIGHT_HOURS + 1;
+                const isClosed = cardAge > FORTY_EIGHT_HOURS;
                 
                 let badgeHTML = "";
                 if (isClosed) {
@@ -888,7 +890,7 @@
                     badgeHTML = `<span class="badge" style="background:#ddd; color:#333;">Active</span>`; 
                 }
 
-                const sportIcon = getSportEmoji(c.sport);
+                const sportIcon = getSportEmoji(c.sport, c.match);
                 const maxLobbyScore = globalLobbiesMaxScores[c.lobby] || 0;
                 const holdsHighScore = score >= maxLobbyScore && score > 1;
                 const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
