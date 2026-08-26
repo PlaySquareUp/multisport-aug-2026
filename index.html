@@ -14,7 +14,7 @@
         :root {
             --bg: #ffffff; --border: #7d39eb; --text-main: #000000; --text-muted: #7d39eb;    
             --square-bg: #000000; --square-hover: #1a1a1a; --square-selected: #7d39eb; 
-            --free-space: #1a1a1a; --accent: #7d39eb; --error: #e53e3e;
+            --free-space: #1a1a1a; --accent: #7d39eb; --error: #e53e3e; --closed: #4a5568;
         }
 
         html, body { margin: 0; padding: 0; background-color: var(--bg); overflow-x: hidden; }
@@ -108,11 +108,13 @@
         .square:active { transform: scale(0.92); }
         .square.selected { background-color: var(--accent); color: white; border-color: var(--accent); text-decoration: line-through; transform: scale(1.02); }
         .square.free-space { background-color: var(--free-space); border-color: var(--accent); color: var(--accent); }
+        .square.locked { cursor: not-allowed; opacity: 0.8; }
 
         .history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; font-size: 0.9rem; align-items: center; color: #ffffff; transition: background-color 0.3s ease; }
         .history-item.flash-active { background-color: rgba(125, 57, 235, 0.3); }
         .badge { background: #333333; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: #ffffff; }
         .badge.win { background: var(--accent); color: #ffffff; }
+        .badge.closed { background: var(--closed); color: #ffffff; }
 
         .drawer-card-item {
             background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px;
@@ -144,7 +146,6 @@
     <h1>SQUAREUP</h1>
     <p class="subtitle">San Diego Sports Edition</p>
 
-    <!-- Setup Card -->
     <div class="widget-box" id="setup-card">
         <h3 style="margin-top: 0; font-size: 1.3rem; color: #ffffff;">FIND A GAME</h3>
         
@@ -180,7 +181,6 @@
         <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;" onclick="toggleSetupView(false)">Cancel</button>
     </div>
 
-    <!-- Active Match Hub Banner -->
     <div class="active-match-banner" id="active-match-banner">
         <div class="banner-top-row">
             <span class="banner-match-title" id="banner-match-text">Select a game...</span>
@@ -204,7 +204,6 @@
         <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #a0aec0;">No historical card instances found.</div>
     </div>
 
-    <!-- Games Drawer Modal -->
     <div class="modal-overlay" id="games-drawer-modal">
         <div class="modal">
             <h3 style="margin-top: 0; font-size: 1.3rem;">YOUR ACTIVE GAMES</h3>
@@ -214,7 +213,6 @@
         </div>
     </div>
 
-    <!-- Auth Modal -->
     <div class="modal-overlay" id="auth-modal">
         <div class="modal">
             <h3 id="auth-title" style="margin-top: 0; font-size: 1.4rem;">CREATE ACCOUNT</h3>
@@ -238,7 +236,6 @@
         </div>
     </div>
 
-    <!-- Bingo Modal -->
     <div class="modal-overlay" id="bingo-modal">
         <div class="modal">
             <h2 style="font-size: 3.5rem; margin: 0 0 10px 0; color: var(--accent);">BINGO</h2>
@@ -275,6 +272,15 @@
 
         function sanitizeKey(str) {
             return str.replace(/[.#$*\/[\]]/g, "_");
+        }
+
+        function getSportEmoji(sportStr) {
+            if (!sportStr) return "🏆";
+            const s = sportStr.toUpperCase();
+            if (s.includes("BASEBALL")) return "⚾";
+            if (s.includes("SOCCER")) return "⚽";
+            if (s.includes("FOOTBALL")) return "🏈";
+            return "🏆";
         }
 
         const universalCore = [
@@ -671,14 +677,20 @@
                 return;
             }
 
+            const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+            const now = Date.now();
+
             container.innerHTML = Object.values(activeCardsList).map(c => {
                 const isSelected = c.cardId === currentCardId;
+                const isClosed = (now - (c.createdAt || now)) > FORTY_EIGHT_HOURS;
+                const statusLabel = isClosed ? "Closed (Locked)" : (isSelected ? "Active Now" : "Tap to switch");
                 const groupLabel = c.groupId && c.groupId !== "Public" ? ` [${c.groupId}]` : "";
+
                 return `
                     <div class="drawer-card-item" style="border-color: ${isSelected ? 'var(--accent)' : '#333'};">
                         <div class="drawer-card-info" onclick="selectGameCard('${c.cardId}')" style="cursor: pointer;">
                             <div class="drawer-card-title">${c.match}${groupLabel}</div>
-                            <div class="drawer-card-sub">${c.sport} • ${isSelected ? 'Active Now' : 'Tap to switch'}</div>
+                            <div class="drawer-card-sub">${c.sport} • ${statusLabel}</div>
                         </div>
                         <button class="btn btn-danger" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" onclick="deleteGameCard('${c.cardId}')">Delete</button>
                     </div>
@@ -724,7 +736,10 @@
             const activeCard = activeCardsList[currentCardId];
             if (!activeCard) return;
 
-            document.getElementById("banner-match-text").innerText = activeCard.match;
+            const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+            const isClosed = (Date.now() - (activeCard.createdAt || Date.now())) > FORTY_EIGHT_HOURS;
+
+            document.getElementById("banner-match-text").innerText = activeCard.match + (isClosed ? " [CLOSED]" : "");
             document.getElementById("banner-sport-tag").innerText = activeCard.sport || "SPORT";
 
             const container = document.getElementById("bingo-board");
@@ -732,42 +747,44 @@
 
             activeCard.board.forEach((item, idx) => {
                 const sq = document.createElement("div");
-                sq.className = `square ${item.isFree ? 'free-space' : ''} ${item.isSelected ? 'selected' : ''}`;
+                sq.className = `square ${item.isFree ? 'free-space' : ''} ${item.isSelected ? 'selected' : ''} ${isClosed ? 'locked' : ''}`;
                 sq.innerText = item.text;
 
-                sq.addEventListener("click", () => {
-                    if (item.isFree) return;
-                    item.isSelected = !item.isSelected;
-                    
-                    const base = activeCard.board.filter(s => s.isSelected).length;
-                    const totalLines = countBingoLines(activeCard.board);
-                    const runningScore = base + (totalLines * 5);
+                if (!isClosed) {
+                    sq.addEventListener("click", () => {
+                        if (item.isFree) return;
+                        item.isSelected = !item.isSelected;
+                        
+                        const base = activeCard.board.filter(s => s.isSelected).length;
+                        const totalLines = countBingoLines(activeCard.board);
+                        const runningScore = base + (totalLines * 5);
 
-                    const targetScoreRow = document.getElementById(`score-row-${currentCardId}`);
-                    if(targetScoreRow) {
-                        targetScoreRow.classList.add('flash-active');
-                        setTimeout(() => targetScoreRow.classList.remove('flash-active'), 400);
-                    }
+                        const targetScoreRow = document.getElementById(`score-row-${currentCardId}`);
+                        if(targetScoreRow) {
+                            targetScoreRow.classList.add('flash-active');
+                            setTimeout(() => targetScoreRow.classList.remove('flash-active'), 400);
+                        }
 
-                    if(isGuestAccount) {
-                        activeCardsList[currentCardId].board[idx].isSelected = item.isSelected;
-                        activeCardsList[currentCardId].completedLines = totalLines;
-                        localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
-                        renderActiveBoard();
-                        renderHistory();
-                    } else {
-                        let updates = {};
-                        updates[`users/${userId}/cards/${currentCardId}/board/${idx}/isSelected`] = item.isSelected;
-                        updates[`users/${userId}/cards/${currentCardId}/completedLines`] = totalLines;
-                        updates[`${activeCard.lobby}/${currentCardId}`] = { name: userDisplayName, score: runningScore };
-                        update(ref(database), updates);
-                    }
+                        if(isGuestAccount) {
+                            activeCardsList[currentCardId].board[idx].isSelected = item.isSelected;
+                            activeCardsList[currentCardId].completedLines = totalLines;
+                            localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
+                            renderActiveBoard();
+                            renderHistory();
+                        } else {
+                            let updates = {};
+                            updates[`users/${userId}/cards/${currentCardId}/board/${idx}/isSelected`] = item.isSelected;
+                            updates[`users/${userId}/cards/${currentCardId}/completedLines`] = totalLines;
+                            updates[`${activeCard.lobby}/${currentCardId}`] = { name: userDisplayName, score: runningScore };
+                            update(ref(database), updates);
+                        }
 
-                    if (totalLines > activeCard.completedLines) {
-                        document.getElementById('modal-desc').innerText = `Bingo Line #${totalLines} unlocked! (+5 Bonus Points)`;
-                        triggerCelebration();
-                    }
-                });
+                        if (totalLines > activeCard.completedLines) {
+                            document.getElementById('modal-desc').innerText = `Bingo Line #${totalLines} unlocked! (+5 Bonus Points)`;
+                            triggerCelebration();
+                        }
+                    });
+                }
                 container.appendChild(sq);
             });
 
@@ -812,6 +829,9 @@
                 return; 
             }
 
+            const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+            const now = Date.now();
+
             const totalWins = historyData.reduce((acc, c) => acc + (c.completedLines || 0), 0);
             const totalPoints = historyData.reduce((acc, c) => {
                 const base = c.board.filter(s => s.isSelected).length;
@@ -839,9 +859,18 @@
                 const base = c.board.filter(s => s.isSelected).length;
                 const score = base + ((c.completedLines || 0) * 5);
                 const isWon = (c.completedLines || 0) > 0;
+                const isClosed = (now - (c.createdAt || now)) > FORTY_EIGHT_HOURS;
                 
-                let badgeHTML = isWon ? `<span class="badge win">BINGO x${c.completedLines}</span>` : `<span class="badge">Active</span>`;
+                let badgeHTML = "";
+                if (isClosed) {
+                    badgeHTML = `<span class="badge closed">Closed</span>`;
+                } else if (isWon) { 
+                    badgeHTML = `<span class="badge win">BINGO x${c.completedLines}</span>`; 
+                } else { 
+                    badgeHTML = `<span class="badge">Active</span>`; 
+                }
 
+                const sportIcon = getSportEmoji(c.sport);
                 const maxLobbyScore = globalLobbiesMaxScores[c.lobby] || 0;
                 const holdsHighScore = score >= maxLobbyScore && score > 1;
                 const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
@@ -849,7 +878,7 @@
 
                 return `
                     <div class='history-item' id="score-row-${c.cardId}">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;">⚽ ${c.match}${groupLabel}</span>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;">${sportIcon} ${c.match}${groupLabel}</span>
                         <div style="display: flex; align-items: center; flex-shrink: 0;">
                             ${badgeHTML}
                             <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
