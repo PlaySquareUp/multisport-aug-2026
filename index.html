@@ -396,7 +396,16 @@
             const selectedTeamKey = teamSelect.value;
             const teamObj = teamSchedules[selectedTeamKey];
             gameSelect.innerHTML = "";
-            teamObj.games.forEach(g => {
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upcomingGames = teamObj.games.filter(g => g.date >= todayStr);
+
+            if (upcomingGames.length === 0) {
+                gameSelect.add(new Option("No upcoming games scheduled", ""));
+                return;
+            }
+
+            upcomingGames.forEach(g => {
                 gameSelect.add(new Option(g.label, g.id));
             });
         }
@@ -687,7 +696,6 @@
                 if (keys.length > 0 && !currentCardId) {
                     currentCardId = keys[0];
                 }
-                // Keep the setup/find-a-game view front-and-center upon login/sync
                 toggleSetupView(true);
             });
         }
