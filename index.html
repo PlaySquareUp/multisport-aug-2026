@@ -200,7 +200,7 @@
     </div>
 
     <div class="widget-box" id="history-card">
-        <h3 style="color: #ffffff; margin-top: 0;">YOUR PERMANENT MATCH ARCHIVE</h3>
+        <h3 style="color: #ffffff; margin-top: 0;">TROPHY ROOM & STATS</h3>
         <div id="history-container" style="text-align: left; font-size: 0.95rem; color: #a0aec0;">No historical card instances found.</div>
     </div>
 
@@ -801,45 +801,64 @@
                 container.innerHTML = `
                     <div style="text-align: center; padding: 10px 5px; color: #a0aec0; font-size: 0.88rem; line-height: 1.4;">
                         <span style="font-size: 1.5rem; display: block; margin-bottom: 4px;">🔒</span>
-                        Permanent History Archive is locked. Create a free account to store your lifetime tournament badges and high score trophies!
+                        Trophy Room & Stats are locked. Create a free account to track your multiplayer rankings, high-score trophies, and lifetime stats!
                     </div>`;
                 return;
             }
 
             const historyData = Object.values(activeCardsList);
-            if (historyData.length === 0) { container.innerHTML = "No historical card instances found."; return; }
+            if (historyData.length === 0) { 
+                container.innerHTML = "<p style='color: #a0aec0; font-size: 0.88rem; text-align: center; margin: 0;'>No historical matches logged yet.</p>"; 
+                return; 
+            }
 
-            const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-            const now = Date.now();
-
-            container.innerHTML = historyData.map(c => {
-                const isWon = c.completedLines > 0;
-                const isCurrent = c.cardId === currentCardId; 
+            const totalWins = historyData.reduce((acc, c) => acc + (c.completedLines || 0), 0);
+            const totalPoints = historyData.reduce((acc, c) => {
                 const base = c.board.filter(s => s.isSelected).length;
-                const score = base + (c.completedLines * 5);
-                
-                const timeElapsed = now - (c.createdAt || now);
-                const isExpired = timeElapsed > TWENTY_FOUR_HOURS;
+                return acc + base + ((c.completedLines || 0) * 5);
+            }, 0);
 
-                let badgeHTML = "";
-                if (isWon) { badgeHTML = `<span class="badge win">BINGO x${c.completedLines}</span>`; } 
-                else if (!isExpired) { badgeHTML = `<span class="badge">Active</span>`; }
+            let html = `
+                <div style="display: flex; justify-content: space-around; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid #333; text-align: center;">
+                    <div>
+                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Total Points</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent);">${totalPoints}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Lines Cleared</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">${totalWins}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #a0aec0; text-transform: uppercase;">Games Played</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;">${historyData.length}</div>
+                    </div>
+                </div>
+            `;
+
+            html += historyData.map(c => {
+                const base = c.board.filter(s => s.isSelected).length;
+                const score = base + ((c.completedLines || 0) * 5);
+                const isWon = (c.completedLines || 0) > 0;
+                
+                let badgeHTML = isWon ? `<span class="badge win">BINGO x${c.completedLines}</span>` : `<span class="badge">Active</span>`;
 
                 const maxLobbyScore = globalLobbiesMaxScores[c.lobby] || 0;
                 const holdsHighScore = score >= maxLobbyScore && score > 1;
-                const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;">🏆</span>' : '';
-                const stateClass = isCurrent ? "" : "stale-card";
+                const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
+                const groupLabel = c.groupId && c.groupId !== "Public" ? ` [Group: ${c.groupId}]` : "";
 
                 return `
-                    <div class='history-item ${stateClass}' id="score-row-${c.cardId}">
-                        <span>⚽ ${c.match}</span>
-                        <div>
+                    <div class='history-item' id="score-row-${c.cardId}">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px;">⚽ ${c.match}${groupLabel}</span>
+                        <div style="display: flex; align-items: center; flex-shrink: 0;">
                             ${badgeHTML}
                             <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
                         </div>
                     </div>
                 `;
             }).join("");
+
+            container.innerHTML = html;
         }
 
         function triggerCelebration() {
