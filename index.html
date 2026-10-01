@@ -351,8 +351,9 @@
                     { id: "padres_CIN_2026_08_31", label: "@ Cincinnati Reds (Aug 31)", opponent: "Cincinnati Reds", date: "2026-08-31" },
                     { id: "padres_NYY_2026_09_04", label: "vs. New York Yankees (Sep 04)", opponent: "New York Yankees", date: "2026-09-04" },
                     { id: "padres_NYY_2026_09_05", label: "vs. New York Yankees (Sep 05)", opponent: "New York Yankees", date: "2026-09-05" },
-                    { id: "padres_NYY_2026_09_06", label: "vs. New York Yankees (Sep 06)", opponent: "New York Yankees", date: "2026-09-06" }
-                    { id: "padres_CHC_2026_09_29", label: "vs. Chicago Cubs (Sep 29)", opponent: "Chicago Cubs", date: 2026-09-29" }
+                    { id: "padres_NYY_2026_09_06", label: "vs. New York Yankees (Sep 06)", opponent: "New York Yankees", date: "2026-09-06" },
+                    { id: "padres_CHC_2026_09_29", label: "vs. Chicago Cubs (Sep 29)", opponent: "Chicago Cubs", date: "2026-09-29" },
+                    { id: "padres_CHC_2026_09_30", label: "vs. Chicago Cubs (Sep 30)", opponent: "Chicago Cubs", date: "2026-09-30" }
                 ]
             },
             wave: {
@@ -398,8 +399,10 @@
             const teamObj = teamSchedules[selectedTeamKey];
             gameSelect.innerHTML = "";
             
-            const todayStr = new Date().toISOString().split('T')[0];
-            const upcomingGames = teamObj.games.filter(g => g.date >= todayStr);
+            // Local-date cutoff (keeps yesterday's games visible so late games and UTC rollover don't hide them)
+            const d = new Date(Date.now() - 86400000);
+            const cutoff = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const upcomingGames = teamObj.games.filter(g => g.date >= cutoff);
 
             if (upcomingGames.length === 0) {
                 gameSelect.add(new Option("No upcoming games scheduled", ""));
