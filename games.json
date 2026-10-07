@@ -1,0 +1,39 @@
+{
+  "padres": {
+    "games": [
+      { "id": "padres_MIL_2026_10_06", "label": "vs. Milwaukee Brewers (NLDS Gm 3 - Oct 06)", "opponent": "Milwaukee Brewers", "date": "2026-10-06" }
+    ]
+  },
+  "wave": {
+    "games": [
+      { "id": "wave_NC_2026_10_17", "label": "@ North Carolina Courage (Oct 17)", "opponent": "North Carolina Courage", "date": "2026-10-17" },
+      { "id": "wave_BOS_2026_10_25", "label": "vs. Boston Legacy FC (Oct 25)", "opponent": "Boston Legacy FC", "date": "2026-10-25" },
+      { "id": "wave_BAY_2026_11_01", "label": "@ Bay FC (Nov 01)", "opponent": "Bay FC", "date": "2026-11-01" }
+    ]
+  },
+  "aztecs": {
+    "games": [
+      { "id": "aztecs_ORST_2026_10_10", "label": "@ Oregon State (Oct 10)", "opponent": "Oregon State", "date": "2026-10-10" },
+      { "id": "aztecs_FRES_2026_10_17", "label": "vs. Fresno State (Oct 17)", "opponent": "Fresno State", "date": "2026-10-17" },
+      { "id": "aztecs_CSU_2026_10_24", "label": "@ Colorado State (Oct 24)", "opponent": "Colorado State", "date": "2026-10-24" },
+      { "id": "aztecs_WSU_2026_10_31", "label": "vs. Washington State (Oct 31)", "opponent": "Washington State", "date": "2026-10-31" },
+      { "id": "aztecs_USU_2026_11_14", "label": "vs. Utah State (Nov 14)", "opponent": "Utah State", "date": "2026-11-14" },
+      { "id": "aztecs_BSU_2026_11_21", "label": "@ Boise State (Nov 21)", "opponent": "Boise State", "date": "2026-11-21" }
+    ]
+  },
+  "chargers": {
+    "games": [
+      { "id": "chargers_DEN_2026_10_11", "label": "vs. Denver Broncos (Oct 11)", "opponent": "Denver Broncos", "date": "2026-10-11" },
+      { "id": "chargers_KC_2026_10_18", "label": "@ Kansas City Chiefs (Oct 18)", "opponent": "Kansas City Chiefs", "date": "2026-10-18" },
+      { "id": "chargers_LAR_2026_11_01", "label": "@ Los Angeles Rams (Nov 01)", "opponent": "Los Angeles Rams", "date": "2026-11-01" },
+      { "id": "chargers_HOU_2026_11_08", "label": "vs. Houston Texans (Nov 08)", "opponent": "Houston Texans", "date": "2026-11-08" },
+      { "id": "chargers_BAL_2026_11_16", "label": "@ Baltimore Ravens (Nov 16)", "opponent": "Baltimore Ravens", "date": "2026-11-16" },
+      { "id": "chargers_NYJ_2026_11_22", "label": "vs. New York Jets (Nov 22)", "opponent": "New York Jets", "date": "2026-11-22" },
+      { "id": "chargers_NE_2026_11_29", "label": "vs. New England Patriots (Nov 29)", "opponent": "New England Patriots", "date": "2026-11-29" },
+      { "id": "chargers_TB_2026_12_06", "label": "@ Tampa Bay Buccaneers (Dec 06)", "opponent": "Tampa Bay Buccaneers", "date": "2026-12-06" },
+      { "id": "chargers_LV_2026_12_13", "label": "@ Las Vegas Raiders (Dec 13)", "opponent": "Las Vegas Raiders", "date": "2026-12-13" },
+      { "id": "chargers_SF_2026_12_17", "label": "vs. San Francisco 49ers (Dec 17)", "opponent": "San Francisco 49ers", "date": "2026-12-17" },
+      { "id": "chargers_MIA_2026_12_27", "label": "@ Miami Dolphins (Dec 27)", "opponent": "Miami Dolphins", "date": "2026-12-27" }
+    ]
+  }
+}
