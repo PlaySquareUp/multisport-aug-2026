@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SQUAREUP: San Diego Edition</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,6 +23,7 @@
             flex-direction: column; align-items: center; padding: 12px; box-sizing: border-box;
             -webkit-tap-highlight-color: transparent; user-select: none;
         }
+        input, select { user-select: text; -webkit-user-select: text; }
 
         .profile-row {
             width: 100%; max-width: 460px; display: flex; justify-content: space-between;
@@ -101,6 +102,8 @@
             border-radius: 6px; display: inline-block; width: 100%; text-transform: uppercase; letter-spacing: 0.5px;
         }
         .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn:disabled:active { transform: none; }
         .btn-secondary { background-color: #333333; margin-top: 8px; border: 1px solid #555; }
         .btn-danger { background-color: var(--error); border: none; }
 
@@ -192,8 +195,9 @@
             <input type="text" id="layout-seed-code" placeholder="e.g., BARSD">
         </div>
 
-        <button class="btn" id="lock-game-btn">Find A Game</button>
-        <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;" onclick="toggleSetupView(false)">Cancel</button>
+        <div class="error-message" id="setup-error"></div>
+        <button class="btn" id="lock-game-btn" style="margin-top: 6px;">Find A Game</button>
+        <button class="btn btn-secondary" id="cancel-setup-btn" style="display: none;">Cancel</button>
     </div>
 
     <div class="active-match-banner" id="active-match-banner">
@@ -241,19 +245,20 @@
             <p style="font-size: 0.85rem; color: #a0aec0; margin-bottom: 15px;">Save your scoreboard rows permanently and track historical high score trophies.</p>
             <div class="input-group" id="username-group">
                 <label>Username Handle</label>
-                <input type="text" id="auth-username" placeholder="e.g., Sinclair_CA">
+                <input type="text" id="auth-username" placeholder="e.g., Sinclair_CA" autocomplete="username" autocapitalize="none" maxlength="20">
             </div>
             <div class="input-group">
                 <label>Email Address</label>
-                <input type="email" id="auth-email" placeholder="name@domain.com">
+                <input type="email" id="auth-email" placeholder="name@domain.com" autocomplete="email">
             </div>
             <div class="input-group">
                 <label>Password</label>
-                <input type="password" id="auth-password" placeholder="Min 6 characters">
+                <input type="password" id="auth-password" placeholder="Min 6 characters" autocomplete="current-password">
             </div>
             <div class="error-message" id="auth-error">Error prompt</div>
             <button class="btn" id="auth-submit-btn" style="margin-top: 10px;">Sign Up</button>
             <span class="auth-toggle" id="auth-toggle-link">Already have an account? Log In</span>
+            <span class="auth-toggle" id="forgot-link" style="display: none; margin-left: 12px;">Forgot password?</span>
             <button class="btn btn-secondary" onclick="closeAuthModal()" style="margin-top: 8px;">Cancel</button>
         </div>
     </div>
@@ -266,10 +271,12 @@
         </div>
     </div>
 
+    <div id="build-tag" style="font-size: 0.7rem; color: #999999; margin: 4px 0 16px 0;">v1.1</div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
         import { getDatabase, ref, set, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
         window.openAuthModal = () => document.getElementById('auth-modal').classList.add('active');
         window.closeAuthModal = () => document.getElementById('auth-modal').classList.remove('active');
@@ -294,6 +301,35 @@
 
         function sanitizeKey(str) {
             return str.replace(/[.#$*\/[\]]/g, "_");
+        }
+
+        // Escapes user-supplied text before it is placed into innerHTML
+        function esc(value) {
+            return String(value ?? "").replace(/[&<>"']/g, ch => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[ch]));
+        }
+
+        const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+        const USERNAME_RULE = "Username must be 3-20 characters: letters, numbers, or underscores.";
+
+        // Guest storage: localStorage with an in-memory fallback (sandboxed iframes can block storage)
+        let memoryGuestStore = null;
+        function readGuestCards() {
+            try {
+                const raw = localStorage.getItem("squareup_guest_cards");
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return memoryGuestStore || {};
+            }
+        }
+        function writeGuestCards(obj) {
+            try { localStorage.setItem("squareup_guest_cards", JSON.stringify(obj)); }
+            catch (e) { memoryGuestStore = obj; }
+        }
+        function clearGuestCards() {
+            try { localStorage.removeItem("squareup_guest_cards"); } catch (e) {}
+            memoryGuestStore = null;
         }
 
         function getSportEmoji(sportStr, matchTitle) {
@@ -338,6 +374,7 @@
             ]
         };
 
+        // Built-in schedule (fallback). If games.json sits next to this file, its games replace these per team.
         const teamSchedules = {
             padres: {
                 sport: "baseball",
@@ -393,29 +430,59 @@
 
         const teamSelect = document.getElementById('team-selector');
         const gameSelect = document.getElementById('game-selector');
+        const lockBtn = document.getElementById('lock-game-btn');
+        const setupErrorDiv = document.getElementById('setup-error');
+
+        function showSetupError(msg) { setupErrorDiv.innerText = msg; setupErrorDiv.style.display = "block"; }
+        function clearSetupError() { setupErrorDiv.innerText = ""; setupErrorDiv.style.display = "none"; }
 
         function updateGameDropdown() {
-            const selectedTeamKey = teamSelect.value;
-            const teamObj = teamSchedules[selectedTeamKey];
+            const prevSelection = gameSelect.value;
+            const teamObj = teamSchedules[teamSelect.value];
             gameSelect.innerHTML = "";
-            
-            // Local-date cutoff (keeps yesterday's games visible so late games and UTC rollover don't hide them)
+            clearSetupError();
+
+            // Local-date cutoff; keeps yesterday's games visible so late games and UTC rollover don't hide them
             const d = new Date(Date.now() - 86400000);
             const cutoff = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            const upcomingGames = teamObj.games.filter(g => g.date >= cutoff);
+            const upcomingGames = teamObj.games
+                .filter(g => g.date >= cutoff)
+                .sort((a, b) => a.date.localeCompare(b.date));
 
             if (upcomingGames.length === 0) {
-                gameSelect.add(new Option("No upcoming games scheduled", ""));
+                gameSelect.add(new Option("No games loaded for this team yet", ""));
+                lockBtn.disabled = true;
                 return;
             }
 
-            upcomingGames.forEach(g => {
-                gameSelect.add(new Option(g.label, g.id));
-            });
+            lockBtn.disabled = false;
+            upcomingGames.forEach(g => gameSelect.add(new Option(g.label, g.id)));
+            if (prevSelection && upcomingGames.some(g => g.id === prevSelection)) gameSelect.value = prevSelection;
+        }
+
+        // Optional: games.json next to this file overrides each team's game list (sport/team name stay in code)
+        async function loadRemoteSchedules() {
+            try {
+                const res = await fetch(`games.json?t=${Date.now()}`, { cache: "no-store" });
+                if (!res.ok) return;
+                const data = await res.json();
+                Object.keys(teamSchedules).forEach(k => {
+                    const remote = data && data[k] && data[k].games;
+                    if (!Array.isArray(remote)) return;
+                    teamSchedules[k].games = remote.filter(g =>
+                        g && typeof g.id === "string" && typeof g.label === "string" && /^\d{4}-\d{2}-\d{2}$/.test(g.date || "")
+                    );
+                });
+                updateGameDropdown();
+            } catch (e) {
+                console.warn("games.json not loaded, using built-in schedule", e);
+            }
         }
 
         teamSelect.addEventListener('change', updateGameDropdown);
+        gameSelect.addEventListener('change', clearSetupError);
         updateGameDropdown();
+        loadRemoteSchedules();
 
         let userId = "";
         let userDisplayName = "Guest";
@@ -423,8 +490,12 @@
         let activeCardsList = {}; 
         let currentCardId = ""; 
         let leaderboardUnsubscribe = null;
+        let leaderboardLobby = "";
+        let unsubscribeCards = null;
+        let hasLoadedCardsOnce = false;
         let isLoginMode = false; 
         let isClaimMode = false; 
+        let signupInProgress = false;
         let globalLobbiesMaxScores = {}; 
         let currentHistoryFilter = 'all';
 
@@ -456,11 +527,14 @@
             }
         };
 
-        window.openGamesDrawer = () => document.getElementById('games-drawer-modal').classList.add('active');
-        window.closeGamesDrawer = () => document.getElementById('games-drawer-modal').classList.remove('active');
+        document.getElementById('cancel-setup-btn').addEventListener('click', () => {
+            toggleSetupView(false);
+            renderActiveBoard();
+        });
 
         document.getElementById('sync-layout-toggle').addEventListener('change', (e) => {
             document.getElementById('seed-input-container').style.display = e.target.checked ? "block" : "none";
+            clearSetupError();
         });
 
         function seededRandomShuffle(array, seedString) {
@@ -478,8 +552,7 @@
 
         function loadGuestSessionData() {
             if(isGuestAccount) {
-                const cached = localStorage.getItem("squareup_guest_cards");
-                activeCardsList = cached ? JSON.parse(cached) : {};
+                activeCardsList = readGuestCards();
                 renderDrawerAndCount();
                 renderHistory();
                 const keys = Object.keys(activeCardsList);
@@ -491,78 +564,160 @@
         }
 
         const authToggleLink = document.getElementById('auth-toggle-link');
+        const forgotLink = document.getElementById('forgot-link');
         const authTitle = document.getElementById('auth-title');
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const errorDiv = document.getElementById('auth-error');
+        const identityLabel = document.getElementById('identity-status-label');
+
+        function displayError(msg) {
+            errorDiv.style.color = "var(--error)";
+            errorDiv.innerText = msg;
+            errorDiv.style.display = "block";
+        }
+        function displayInfo(msg) {
+            errorDiv.style.color = "#9ae6b4";
+            errorDiv.innerText = msg;
+            errorDiv.style.display = "block";
+        }
+
+        function friendlyAuthError(err) {
+            const map = {
+                "auth/invalid-credential": "Email or password is incorrect.",
+                "auth/wrong-password": "Email or password is incorrect.",
+                "auth/user-not-found": "Email or password is incorrect.",
+                "auth/invalid-email": "Enter a valid email address.",
+                "auth/email-already-in-use": "That email already has an account. Try logging in.",
+                "auth/weak-password": "Password must be at least 6 characters.",
+                "auth/too-many-requests": "Too many attempts. Wait a minute and try again.",
+                "auth/network-request-failed": "Network error. Check your connection and try again."
+            };
+            return map[err && err.code] || "Something went wrong. Please try again.";
+        }
+
+        function resetAuthModalText() {
+            authToggleLink.style.display = "inline-block";
+            forgotLink.style.display = isLoginMode ? "inline-block" : "none";
+            authTitle.innerText = isLoginMode ? "ACCOUNT LOGIN" : "CREATE ACCOUNT";
+            authSubmitBtn.innerText = isLoginMode ? "Log In" : "Sign Up";
+            authToggleLink.innerText = isLoginMode ? "Need a new profile? Sign Up" : "Already have an account? Log In";
+            document.getElementById('username-group').style.display = isLoginMode ? "none" : "block";
+        }
+
+        function enterClaimMode() {
+            userDisplayName = "Player";
+            isClaimMode = true;
+            identityLabel.innerText = `@${userDisplayName}`;
+            authTitle.innerText = "CLAIM YOUR USERNAME";
+            authSubmitBtn.innerText = "Save Handle";
+            document.getElementById('username-group').style.display = "block";
+            authToggleLink.style.display = "none";
+            forgotLink.style.display = "none";
+            openAuthModal();
+        }
+
+        identityLabel.addEventListener('click', () => { if (isClaimMode) openAuthModal(); });
 
         authToggleLink.addEventListener('click', () => {
             isLoginMode = !isLoginMode;
             errorDiv.style.display = "none";
-            if(isLoginMode) {
-                authTitle.innerText = "ACCOUNT LOGIN";
-                authSubmitBtn.innerText = "Log In";
-                authToggleLink.innerText = "Need a new profile? Sign Up";
-                document.getElementById('username-group').style.display = "none";
-            } else {
-                authTitle.innerText = "CREATE ACCOUNT";
-                authSubmitBtn.innerText = "Sign Up";
-                authToggleLink.innerText = "Already have an account? Log In";
-                document.getElementById('username-group').style.display = "block";
+            resetAuthModalText();
+        });
+
+        forgotLink.addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value.trim();
+            if (!email) { displayError("Enter your email above, then tap Forgot password."); return; }
+            try {
+                await sendPasswordResetEmail(auth, email);
+                displayInfo("Password reset email sent. Check your inbox (and spam folder).");
+            } catch (err) {
+                console.error(err);
+                displayError(friendlyAuthError(err));
             }
         });
 
-        authSubmitBtn.addEventListener('click', () => {
+        authSubmitBtn.addEventListener('click', async () => {
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
             const username = document.getElementById('auth-username').value.trim();
             errorDiv.style.display = "none";
 
             if (isClaimMode) {
-                if (!username) { displayError("Please enter a username handle."); return; }
-                set(ref(database, `users/${userId}/profile`), { username: sanitizeKey(username) })
-                    .then(() => {
-                        isClaimMode = false;
-                        document.getElementById('auth-toggle-link').style.display = "inline-block"; 
-                        closeAuthModal();
-                    })
-                    .catch(err => displayError(err.message));
+                if (!USERNAME_RE.test(username)) { displayError(USERNAME_RULE); return; }
+                try {
+                    await set(ref(database, `users/${userId}/profile`), { username: sanitizeKey(username) });
+                    isClaimMode = false;
+                    resetAuthModalText();
+                    closeAuthModal();
+                } catch (err) {
+                    console.error(err);
+                    displayError("Couldn't save your username. Please try again.");
+                }
                 return; 
             }
 
             if(!email || !password || (!isLoginMode && !username)) { displayError("Please complete all fields."); return; }
+            if(!isLoginMode && !USERNAME_RE.test(username)) { displayError(USERNAME_RULE); return; }
 
-            if(isLoginMode) {
-                signInWithEmailAndPassword(auth, email, password)
-                    .then(() => closeAuthModal())
-                    .catch(err => displayError(err.message));
-            } else {
-                createUserWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        return set(ref(database, `users/${userCredential.user.uid}/profile`), { username: sanitizeKey(username) });
-                    })
-                    .then(() => {
-                        const guestCards = JSON.parse(localStorage.getItem("squareup_guest_cards") || "{}");
-                        Object.keys(guestCards).forEach(cid => {
-                            guestCards[cid].name = sanitizeKey(username); 
-                            set(ref(database, `users/${userCredential.user.uid}/cards/${cid}`), guestCards[cid]);
-                            set(ref(database, `${guestCards[cid].lobby}/${cid}`), { name: sanitizeKey(username), score: 1 });
-                        });
-                        localStorage.removeItem("squareup_guest_cards"); 
-                        closeAuthModal();
-                    })
-                    .catch(err => displayError(err.message));
+            authSubmitBtn.disabled = true;
+            let profileSaved = false;
+            try {
+                if(isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    closeAuthModal();
+                } else {
+                    signupInProgress = true;
+                    const cred = await createUserWithEmailAndPassword(auth, email, password);
+                    const uid = cred.user.uid;
+                    const handle = sanitizeKey(username);
+                    await set(ref(database, `users/${uid}/profile`), { username: handle });
+                    profileSaved = true;
+
+                    // Claim guest games: write everything first, clear local data only after success
+                    const guestCards = readGuestCards();
+                    await Promise.all(Object.values(guestCards)
+                        .filter(card => card && card.cardId && card.lobby && Array.isArray(card.board))
+                        .flatMap(card => {
+                            card.name = handle;
+                            const score = card.board.filter(s => s.isSelected).length + ((card.completedLines || 0) * 5);
+                            return [
+                                set(ref(database, `users/${uid}/cards/${card.cardId}`), card),
+                                set(ref(database, `${card.lobby}/${card.cardId}`), { name: handle, score })
+                            ];
+                        }));
+                    clearGuestCards();
+                    closeAuthModal();
+                }
+            } catch (err) {
+                console.error(err);
+                if (!isLoginMode && auth.currentUser && !profileSaved) {
+                    // Account exists but the username wasn't saved: let them finish it
+                    enterClaimMode();
+                    displayError("Account created. Choose a username to finish setup.");
+                } else if (!isLoginMode && profileSaved) {
+                    // Account and username are fine; guest games stay on this device
+                    closeAuthModal();
+                } else {
+                    displayError(friendlyAuthError(err));
+                }
+            } finally {
+                signupInProgress = false;
+                authSubmitBtn.disabled = false;
             }
         });
 
+        ['auth-username', 'auth-email', 'auth-password'].forEach(id => {
+            document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') authSubmitBtn.click(); });
+        });
+        document.getElementById('layout-seed-code').addEventListener('keydown', e => { if (e.key === 'Enter') lockBtn.click(); });
+
         document.getElementById('logout-btn').addEventListener('click', () => {
             signOut(auth).then(() => {
-                localStorage.removeItem("squareup_guest_cards");
+                clearGuestCards();
                 document.getElementById("bingo-board").innerHTML = "";
                 location.reload();
             }).catch(console.error);
         });
-
-        function displayError(msg) { errorDiv.innerText = msg; errorDiv.style.display = "block"; }
 
         onAuthStateChanged(auth, user => {
             if (user) {
@@ -573,19 +728,12 @@
                 
                 onValue(ref(database, `users/${userId}/profile`), snap => {
                     const prof = snap.val() || {};
-                    if (!prof.username) {
-                        userDisplayName = "Player";
-                        isClaimMode = true;
-                        document.getElementById('identity-status-label').innerText = `@${userDisplayName}`;
-                        document.getElementById('auth-title').innerText = "CLAIM YOUR USERNAME";
-                        document.getElementById('auth-submit-btn').innerText = "Save Handle";
-                        document.getElementById('username-group').style.display = "block";
-                        document.getElementById('auth-toggle-link').style.display = "none";
-                        openAuthModal();
-                    } else {
+                    if (prof.username) {
                         userDisplayName = prof.username;
                         isClaimMode = false;
-                        document.getElementById('identity-status-label').innerText = `@${userDisplayName}`;
+                        identityLabel.innerText = `@${userDisplayName}`;
+                    } else if (!signupInProgress) {
+                        enterClaimMode();
                     }
                     syncUserSessions();
                 });
@@ -593,21 +741,33 @@
                 isGuestAccount = true;
                 userDisplayName = "Guest";
                 isClaimMode = false;
-                document.getElementById('identity-status-label').innerText = "Guest Player";
+                identityLabel.innerText = "Guest Player";
                 document.getElementById('auth-header-action').style.display = "inline-block";
                 document.getElementById('logout-btn').style.display = "none";
                 loadGuestSessionData();
             }
         });
 
-        document.getElementById('lock-game-btn').addEventListener('click', () => {
+        lockBtn.addEventListener('click', () => {
+            clearSetupError();
             const teamKey = teamSelect.value;
             const teamObj = teamSchedules[teamKey];
             const selectedGameId = gameSelect.value;
             const gameObj = teamObj.games.find(g => g.id === selectedGameId);
+
+            if (!gameObj) {
+                showSetupError("No game selected. Pick a team that has an upcoming game.");
+                return;
+            }
             
+            const useCode = document.getElementById('sync-layout-toggle').checked;
+            const seedCode = useCode ? sanitizeKey(document.getElementById('layout-seed-code').value.trim().toUpperCase()) : "";
+            if (useCode && !seedCode) {
+                showSetupError("Enter a group code, or turn off \"Use a group code\".");
+                return;
+            }
+
             const sport = teamObj.sport;
-            const seedCode = sanitizeKey(document.getElementById('layout-seed-code').value.trim().toUpperCase());
             const groupIdInput = seedCode ? `_${seedCode}` : "";
             const lobbyName = sanitizeKey(`lobby_${gameObj.id}${groupIdInput}`);
             
@@ -622,11 +782,10 @@
             }
 
             const cardId = "card_" + Date.now();
-            const syncToggle = document.getElementById('sync-layout-toggle').checked;
             const activePool = sportPools[sport];
             
             let shuffled;
-            if(syncToggle && seedCode.length > 0) {
+            if(useCode) {
                 shuffled = seededRandomShuffle(activePool, seedCode).slice(0, 24);
             } else {
                 shuffled = [...activePool].sort(() => Math.random() - 0.5).slice(0, 24);
@@ -656,7 +815,7 @@
             if(isGuestAccount) {
                 const updatedCache = { [cardId]: cardPayload, ...activeCardsList };
                 activeCardsList = updatedCache;
-                localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
+                writeGuestCards(activeCardsList);
                 renderDrawerAndCount();
                 renderHistory();
                 renderActiveBoard();
@@ -678,7 +837,9 @@
         }
 
         function syncUserSessions() {
-            onValue(ref(database, `users/${userId}/cards`), snapshot => {
+            if (unsubscribeCards) unsubscribeCards();   // prevents stacked duplicate listeners
+            hasLoadedCardsOnce = false;
+            unsubscribeCards = onValue(ref(database, `users/${userId}/cards`), snapshot => {
                 const incomingData = snapshot.val() || {};
                 const sortedKeys = Object.keys(incomingData).sort((a,b) => b.localeCompare(a));
                 activeCardsList = {};
@@ -696,11 +857,21 @@
 
                 Promise.all(fetchPromises).then(() => renderHistory());
                 
-                const keys = Object.keys(activeCardsList);
-                if (keys.length > 0 && !currentCardId) {
-                    currentCardId = keys[0];
+                if (!activeCardsList[currentCardId]) currentCardId = sortedKeys[0] || "";
+
+                if (!hasLoadedCardsOnce) {
+                    // Land on the setup screen only on the first load
+                    hasLoadedCardsOnce = true;
+                    toggleSetupView(true);
+                } else if (!currentCardId) {
+                    // Last card was deleted
+                    closeGamesDrawer();
+                    toggleSetupView(true);
+                } else if (document.getElementById('setup-card').style.display === 'none') {
+                    // Board is on screen: refresh it in place instead of leaving it
+                    toggleSetupView(false);
+                    renderActiveBoard();
                 }
-                toggleSetupView(true);
             });
         }
 
@@ -723,14 +894,15 @@
                 const isClosed = cardAge > FORTY_EIGHT_HOURS;
                 const statusLabel = isClosed ? "Closed (Locked)" : (isSelected ? "Active Now" : "Tap to switch");
                 const groupLabel = c.groupId && c.groupId !== "Public" ? ` [${c.groupId}]` : "";
+                const safeId = String(c.cardId).replace(/[^A-Za-z0-9_\-]/g, "");
 
                 return `
                     <div class="drawer-card-item" style="border-color: ${isSelected ? 'var(--accent)' : '#333'};">
-                        <div class="drawer-card-info" onclick="selectGameCard('${c.cardId}')" style="cursor: pointer;">
-                            <div class="drawer-card-title">${c.match}${groupLabel}</div>
-                            <div class="drawer-card-sub">${c.sport || 'SOCCER'} • ${statusLabel}</div>
+                        <div class="drawer-card-info" onclick="selectGameCard('${safeId}')" style="cursor: pointer;">
+                            <div class="drawer-card-title">${esc(c.match)}${esc(groupLabel)}</div>
+                            <div class="drawer-card-sub">${esc(c.sport || 'SOCCER')} • ${statusLabel}</div>
                         </div>
-                        <button class="btn btn-danger" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" onclick="deleteGameCard('${c.cardId}')">Delete</button>
+                        <button class="btn btn-danger" style="width: auto; padding: 6px 12px; font-size: 0.7rem;" onclick="deleteGameCard('${safeId}')">Delete</button>
                     </div>
                 `;
             }).join("");
@@ -750,13 +922,15 @@
                 
                 if (isGuestAccount) {
                     delete activeCardsList[targetId];
-                    localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
+                    writeGuestCards(activeCardsList);
+                    const keys = Object.keys(activeCardsList);
+                    if (!currentCardId) currentCardId = keys[0] || "";
                     renderDrawerAndCount();
                     renderHistory();
-                    const keys = Object.keys(activeCardsList);
-                    if(keys.length > 0) {
-                        currentCardId = keys[0];
+                    if (keys.length > 0) {
+                        renderActiveBoard();
                     } else {
+                        closeGamesDrawer();
                         toggleSetupView(true);
                     }
                 } else {
@@ -791,6 +965,10 @@
                 if (!isClosed) {
                     sq.addEventListener("click", () => {
                         if (item.isFree) return;
+
+                        // Capture the line count BEFORE anything is mutated so bingo detection works
+                        const prevLines = activeCard.completedLines || 0;
+
                         item.isSelected = !item.isSelected;
                         
                         const base = activeCard.board.filter(s => s.isSelected).length;
@@ -806,7 +984,7 @@
                         if(isGuestAccount) {
                             activeCardsList[currentCardId].board[idx].isSelected = item.isSelected;
                             activeCardsList[currentCardId].completedLines = totalLines;
-                            localStorage.setItem("squareup_guest_cards", JSON.stringify(activeCardsList));
+                            writeGuestCards(activeCardsList);
                             renderActiveBoard();
                             renderHistory();
                         } else {
@@ -817,7 +995,7 @@
                             update(ref(database), updates);
                         }
 
-                        if (totalLines > activeCard.completedLines) {
+                        if (totalLines > prevLines) {
                             document.getElementById('modal-desc').innerText = `Bingo Line #${totalLines} unlocked! (+5 Bonus Points)`;
                             triggerCelebration();
                         }
@@ -839,12 +1017,15 @@
         }
 
         function listenToLeaderboard(lobbyPath) {
+            // Only re-subscribe when the lobby actually changes
+            if (leaderboardLobby === lobbyPath && leaderboardUnsubscribe) return;
             if (leaderboardUnsubscribe) leaderboardUnsubscribe();
+            leaderboardLobby = lobbyPath;
             leaderboardUnsubscribe = onValue(ref(database, lobbyPath), snapshot => {
                 const records = snapshot.val() || {};
-                const sorted = Object.values(records).sort((a,b) => b.score - a.score);
+                const sorted = Object.values(records).sort((a,b) => (Number(b.score) || 0) - (Number(a.score) || 0));
                 document.getElementById('leaderboard-container').innerHTML = sorted.map(p => `
-                    <div class='history-item'><span>${p.name}</span><strong>${p.score} PTS</strong></div>
+                    <div class='history-item'><span>${esc(p.name)}</span><strong>${Number(p.score) || 0} PTS</strong></div>
                 `).join("");
             });
         }
@@ -931,10 +1112,11 @@
                     const holdsHighScore = score >= maxLobbyScore && score > 1;
                     const trophyIcon = holdsHighScore ? '<span style="margin-right:4px;" title="Lobby High Score Leader!">🏆</span>' : '';
                     const groupLabel = c.groupId && c.groupId !== "Public" ? ` [Group: ${c.groupId}]` : "";
+                    const safeId = String(c.cardId).replace(/[^A-Za-z0-9_\-]/g, "");
 
                     return `
-                        <div class='trophy-history-item' id="score-row-${c.cardId}">
-                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; font-weight: 500;">${sportIcon} ${c.match}${groupLabel}</span>
+                        <div class='trophy-history-item' id="score-row-${safeId}">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; font-weight: 500;">${sportIcon} ${esc(c.match)}${esc(groupLabel)}</span>
                             <div style="display: flex; align-items: center; flex-shrink: 0;">
                                 ${badgeHTML}
                                 <strong style="margin-left: 8px;">${trophyIcon}${score} PTS</strong>
