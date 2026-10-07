@@ -1,7 +1,9 @@
 {
   "padres": {
     "games": [
-      { "id": "padres_MIL_2026_10_06", "label": "vs. Milwaukee Brewers (NLDS Gm 3 - Oct 06)", "opponent": "Milwaukee Brewers", "date": "2026-10-06" }
+      { "id": "padres_MIL_2026_10_06", "label": "vs. Milwaukee Brewers (NLDS Gm 3 - Oct 06)", "opponent": "Milwaukee Brewers", "date": "2026-10-06" },
+      { "id": "padres_MIL_2026_10_07", "label": "vs. Milwaukee Brewers (NLDS Gm 4 - Oct 07)", "opponent": "Milwaukee Brewers", "date": "2026-10-07" },
+      { "id": "padres_MIL_2026_10_09", "label": "@ Milwaukee Brewers (NLDS Gm 5 - Oct 09)", "opponent": "Milwaukee Brewers", "date": "2026-10-09" }
     ]
   },
   "wave": {
